@@ -1,0 +1,8 @@
+{
+    "ignore": [
+        "__pycache__",
+        ".git",
+        ".vscode",
+        ".not2Pico"
+    ]
+}
