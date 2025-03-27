@@ -10,7 +10,6 @@ import ArialRoundedMT_70pix as BIG_FONT
 uart1 = UART(1, baudrate=9600, tx=Pin(8), rx=Pin(9))  # Nastav piny dle zapojení
 
 distances = []
-times = []
 max_records = 128  # Počet měření za posledních 6 hodin -> uložit každé 12 měření á 15 sec.
 
 pwmLCD = PWM(Pin(10))
@@ -20,12 +19,10 @@ spi = SPI( 0, baudrate = 1_000_000, polarity = 1, phase = 1 )
 lcd = LCD12864_SPI( spi = spi, cs_pin = 15, rst_pin = 4, rotation = 1 )
 lcd.clear()
 UpdateLCD = False
-
+BlockMenu = False
 
 # Inicializace rotačního enkodéru
 rot = RotaryIRQ(pin_num_clk=6, pin_num_dt=7, min_val=0, max_val=5, reverse=False, range_mode=RotaryIRQ.RANGE_WRAP, pull_up=True)
-rot.set(value=0)
-# nahrazuje init
 RotaryLastVal = 100
 
 """
@@ -38,11 +35,10 @@ button = Pin(14, Pin.IN, Pin.PULL_UP)
 led = Pin("LED", Pin.OUT)
 
 # Seznam položek menu
-menu_items = ["Polozka 1", "Polozka 2", "Polozka 3", "Polozka 4", "Polozka 5"]
-submenus = ["Submenu 1", "Submenu 2", "Submenu 3", "Submenu 4", "Submenu 5"]
-current_index = 0
-in_submenu = False
-
+home_screens = ["Home 1", "Home 2", "Home 3", "Setting menu" ]
+ActualScreen = home_screens[0]
+rot.set(value=0)  # nahrazuje init
+rot.set(max_val = len(home_screens) - 1)
 
 def map_value(x, in_min, in_max, out_min, out_max):
     return int((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
@@ -94,18 +90,26 @@ def draw_graph():
     lcd.show()
 
 """
-HAPTIC Timer
+HAPTIC Timer call cyclic
 """
-def haptic(timer):
-    global RotaryLastVal, UpdateLCD
+def haptic(timer):    
+    global RotaryLastVal, UpdateLCD, ActualScreen    
     _val = rot.value()
     if RotaryLastVal != _val:
         RotaryLastVal = _val
         UpdateLCD = True
         print(f"Rotary value {RotaryLastVal}")
-        
+        if ActualScreen != "Setting menu":
+            ActualScreen = home_screens[RotaryLastVal]
+
+
 hapticTimer = Timer()
 hapticTimer.init(period=20, mode=Timer.PERIODIC, callback=haptic) 
+
+def rotary_reset_to(value):
+    global RotaryLastVal
+    rot.set(value)
+    RotaryLastVal = value
 
 def task1(timer):    
     global UpdateLCD
@@ -145,32 +149,27 @@ def draw_bar(fill_percentage):
 
 def draw_screens(screen_id):    
     global UpdateLCD
-    if UpdateLCD:  
-        if screen_id == 0:                    
-            lcd.fill(0)
-            lcd.set_font(BIG_FONT)
-            lcd.set_text_wrap()
-            lcd.text("Default 8x8 font", 0, 0)
-            lcd.draw_text("92%", 0, 0)
-            lcd.show()                
-        elif screen_id == 1:
-            draw_graph()
-        else:       
-            print("error screen id")
+    if UpdateLCD:          
+        lcd.fill(0)
+        lcd.set_font(BIG_FONT)
+        lcd.set_text_wrap()
+        lcd.text("Home screen", 0, 0)
+        lcd.draw_text(str(screen_id), 0, 0)
+        lcd.show()                        
         UpdateLCD = False        
 
+pwmLCD.duty_u16(15000)
 
-pwmLCD.duty_u16(25000)
 
 # Definice viceurovnoveho menu
 menu = {
-    "Hlavni menu": ["Polozka 1", "Polozka 2", "Polozka 3", 2],
+    "Setting menu": ["Polozka 1", "Polozka 2", "Polozka 3", 2],
     "Polozka 1": ["Akce 1 1", "Zpet", 1],
     "Polozka 2": ["Akce 2 1", "Akce 2 2", "Zpet", 2],
     "Polozka 3": ["Akce 3 1", "Akce 3 2", "Akce 3 3" , "Zpet", 3]
 }
 
-current_menu = "Hlavni menu"
+current_menu = "Setting menu"
 selected_index = 0
 
 def draw_menu():        
@@ -186,76 +185,78 @@ def draw_menu():
     lcd.show()
     UpdateLCD = False
 
-def navigate_menu(direction):
+def navigate_menu():
     """ Posune kurzor nahoru nebo dolu v menu """
     global selected_index
-    selected_index = direction #(selected_index + direction) % len(menu[current_menu][:-1])
-    draw_menu()
+    if UpdateLCD:
+        selected_index = RotaryLastVal #(selected_index + direction) % len(menu[current_menu][:-1])
+        draw_menu()
 
-def select_item(pin):
-    """ Potvrdi vyber v menu """
-    global current_menu, selected_index
+def button_press(pin):    
+    global current_menu, selected_index, BlockMenu, UpdateLCD, ActualScreen
+    UpdateLCD = True
 
-    selected_item = menu[current_menu][selected_index]
-    
-    if selected_item == "Zpet":
-        current_menu = "Hlavni menu"
-        rot.set(value=0)
-    elif selected_item in menu:  # Pokud existuje podmenu
-        current_menu = selected_item
-        rot.set(value=0)
-    
-    selected_index = 0
-    draw_menu()
-
+    if ActualScreen != "Setting menu":
+        # entry into setting menu
+        ActualScreen = "Setting menu"
+        current_menu = "Setting menu"
+        selected_index = 0
+        rotary_reset_to(0)
+        rot.set(max_val = menu[current_menu][-1])
+        draw_menu()
+    else: #je v menu
+        selected_item = menu[current_menu][selected_index]       
+        if selected_item == "Zpet":
+            current_menu = "Setting menu"
+            rot.set(value=0)
+            selected_index = 0
+            draw_menu()
+        elif selected_item in menu:  # Pokud existuje podmenu
+            current_menu = selected_item
+            rot.set(value=0)
+            selected_index = 0
+            draw_menu()
+        else:            
+            print("Entry into action")
 
 # Nastaveni preruseni
-button.irq(trigger=Pin.IRQ_FALLING, handler=select_item)
+button.irq(trigger=Pin.IRQ_FALLING, handler=button_press)
 
 # Zobrazeni menu pri startu
-draw_menu()
+#draw_menu()
 
-# Hlavni smycka pro polling rotary enkoderu
-while True:
-    
+# Hlavni smycka
+while True:    
+    if ActualScreen == "Home 1":
+        print("Home 1")
+        draw_screens(home_screens.index(ActualScreen))
+    elif ActualScreen == "Home 2":
+        print("Home 2")
+        draw_screens(home_screens.index(ActualScreen))
+    elif ActualScreen == "Home 3":
+        draw_screens(home_screens.index(ActualScreen))
+        print("Home 3")
+    elif ActualScreen == "Setting menu":
+        print("Setting menu")
+        navigate_menu()
+    else:
+        print("Error actual screen") 
+    time.sleep(0.5)        
+
+"""
     if UpdateLCD:
-        rot.set(max_val = menu[current_menu][-1])
-        print(f"Rotary set max value {menu[current_menu][-1]}")
-        navigate_menu(RotaryLastVal)
+        if BlockMenu:        
+            rot.set(max_val = menu[current_menu][-1])
+            print(f"Rotary set max value {menu[current_menu][-1]}")
+            navigate_menu(RotaryLastVal)
+        else:
+            selected_item = menu[current_menu][selected_index]
+            # tohle nefunguje po startu
+            if selected_item == "Akce 1 1":
+                draw_bar(50)
+        
         UpdateLCD = False            
     #if not button.value():  # Kontrola stisknuti tlacitka
     #    select_item()
     time.sleep(0.1)  # Debounce
-
 """
-# Hlavní smyčka
-#draw_menu(current_index)
-while True:
-    #draw_screens(RotaryLastVal)
-        
-    
-    navigate_menu(RotaryLastVal)
-    
-    #val = rot.value()
-    #draw_bar(map_value(val, 0, 25, 0, 100))            
-    #pwm_map = map_value(val, 0, 25, 0, 65535)       
-        
-    time.sleep(0.2)
-"""
-
-"""
-    if not in_submenu:
-        if val != RotaryLastVal:
-            current_index = val
-            draw_menu(current_index)
-            RotaryLastVal = val
-        if button.value() == 0:
-            in_submenu = True
-            draw_submenu(current_index)
-            time.sleep(0.1)  # Debounce
-    else:
-        if button.value() == 0:
-            in_submenu = False
-            draw_menu(current_index)
-            time.sleep(0.3)  # Debounce
-"""            
