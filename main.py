@@ -32,6 +32,9 @@ ROTARY def set(self, value=None, min_val=None, incr=None,
 
 # Inicializace tlačítka potvrzení
 button = Pin(14, Pin.IN, Pin.PULL_UP)
+button_debounce_time_ms = 13
+button_debounce_timer = Timer(-1) # -1 means SW timer 
+
 led = Pin("LED", Pin.OUT)
 
 def rotary_reset_and_set_to_max(value):
@@ -42,7 +45,7 @@ def rotary_reset_and_set_to_max(value):
     print(f"Rotary reset & set to max {rot.get_max_val()}")    
 
 # Seznam položek menu
-home_screens = ["Home 0", "Home 1", "Home 2", "Setting menu" ]
+home_screens = ["Home 0", "Home 1", "Home 2", "Setting screen" ]
 ActualScreen = home_screens[0]
 rotary_reset_and_set_to_max(len(home_screens) - 2) # note posledni prvek nesmi byt otacenim dosazitelny
 
@@ -109,8 +112,8 @@ def haptic(timer):
             ActualScreen = home_screens[RotaryLastVal]
 
 
-hapticTimer = Timer()
-hapticTimer.init(period=20, mode=Timer.PERIODIC, callback=haptic) 
+hapticTimer = Timer(-1)
+hapticTimer.init(period=19, mode=Timer.PERIODIC, callback=haptic) 
 
 def task1(timer):    
     global UpdateLCD
@@ -124,8 +127,8 @@ def task1(timer):
     #UpdateLCD = True
     #draw_graph()            
 
-tim = Timer()
-tim.init(period=1000, mode=Timer.PERIODIC, callback=task1)
+tim = Timer(-1)
+tim.init(period=997, mode=Timer.PERIODIC, callback=task1)
 
 
 def draw_bar(fill_percentage):
@@ -165,7 +168,7 @@ pwmLCD.duty_u16(15000)
 
 # Definice viceurovnoveho menu
 menu = {
-    "Setting menu": ["Polozka 1", "Polozka 2", "Polozka 3"],
+    "Setting menu": ["Polozka 1", "Polozka 2", "Polozka 3", "Zpet"],
     "Polozka 1": ["Akce 1 1", "Zpet"],
     "Polozka 2": ["Akce 2 1", "Akce 2 2", "Zpet"],
     "Polozka 3": ["Akce 3 1", "Akce 3 2", "Akce 3 3" , "Zpet"]
@@ -195,34 +198,44 @@ def navigate_menu():
         draw_menu()
         print("Setting menu")
 
-def button_press(pin):    
+def check_button(_):  
     global current_menu, selected_action, BlockMenu, UpdateLCD, ActualScreen
-    UpdateLCD = True
+    if button.value() == 0:
+    
+        UpdateLCD = True
 
-    if ActualScreen != "Setting menu":
-        # entry into setting menu
-        ActualScreen = "Setting menu"
-        current_menu = "Setting menu"
-        selected_action = 0
-        rotary_reset_and_set_to_max(len(menu[current_menu]) - 1)
-        draw_menu()
-    else: #je v menu
-        selected_item = menu[current_menu][selected_action]       
-        if selected_item == "Zpet":
+        if ActualScreen != "Setting screen":
+            # entry into setting menu
+            ActualScreen = "Setting screen"
             current_menu = "Setting menu"
-            rotary_reset_and_set_to_max(len(menu[current_menu]) - 1)
             selected_action = 0
-            draw_menu()
-        elif selected_item in menu:  # Pokud existuje podmenu
-            current_menu = selected_item
             rotary_reset_and_set_to_max(len(menu[current_menu]) - 1)
-            selected_action = 0
             draw_menu()
-        else:            
-            print("Entry into action")
+        else: #je v menu
+            selected_item = menu[current_menu][selected_action]       
+            if selected_item == "Zpet":
+                current_menu = "Setting menu"
+                rotary_reset_and_set_to_max(len(menu[current_menu]) - 1)
+                selected_action = 0
+                draw_menu()
+            elif selected_item in menu:  # Pokud existuje podmenu
+                current_menu = selected_item
+                rotary_reset_and_set_to_max(len(menu[current_menu]) - 1)
+                selected_action = 0
+                draw_menu()
+            elif menu[current_menu] == "Setting menu" and selected_action == menu[current_menu].index("Zpet"):
+                # navrat zpet na screeny
+                ActualScreen = home_screens[0]
+                rotary_reset_and_set_to_max(len(home_screens) - 2)
+            else:            
+                print("Entry into action")
+
+def button_isr(pin):
+    global button_debounce_timer
+    button_debounce_timer.init(mode=Timer.ONE_SHOT, period=button_debounce_time_ms, callback=check_button)
 
 # Nastaveni preruseni
-button.irq(trigger=Pin.IRQ_FALLING, handler=button_press)
+button.irq(trigger=Pin.IRQ_FALLING, handler=button_isr)
 
 # Zobrazeni menu pri startu
 #draw_menu()
@@ -235,7 +248,7 @@ while True:
         draw_screens(home_screens.index(ActualScreen))
     elif ActualScreen == "Home 2":
         draw_screens(home_screens.index(ActualScreen))        
-    elif ActualScreen == "Setting menu":        
+    elif ActualScreen == "Setting screen":        
         navigate_menu()
         #TODO tady vsechny akce!!
     else:
