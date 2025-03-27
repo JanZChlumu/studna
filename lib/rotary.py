@@ -114,6 +114,9 @@ class Rotary(object):
 
     def reset(self):
         self._value = 0
+    
+    def get_max_val(self):
+        return self._max_val
 
     def close(self):
         self._hal_close()
