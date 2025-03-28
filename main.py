@@ -19,7 +19,6 @@ spi = SPI( 0, baudrate = 1_000_000, polarity = 1, phase = 1 )
 lcd = LCD12864_SPI( spi = spi, cs_pin = 15, rst_pin = 4, rotation = 1 )
 lcd.clear()
 UpdateLCD = False
-BlockMenu = False
 
 # Inicializace rotačního enkodéru
 rot = RotaryIRQ(pin_num_clk=6, pin_num_dt=7, min_val=0, max_val=5, reverse=False, range_mode=RotaryIRQ.RANGE_WRAP, pull_up=True)
@@ -32,7 +31,7 @@ ROTARY def set(self, value=None, min_val=None, incr=None,
 
 # Inicializace tlačítka potvrzení
 button = Pin(14, Pin.IN, Pin.PULL_UP)
-button_debounce_time_ms = 13
+button_debounce_time_ms = 21
 button_debounce_timer = Timer(-1) # -1 means SW timer 
 
 led = Pin("LED", Pin.OUT)
@@ -42,12 +41,13 @@ def rotary_reset_and_set_to_max(value):
     rot.reset()
     rot.set(max_val = value)
     RotaryLastVal = value
+    #toto pridej global selected_action = 0
     print(f"Rotary reset & set to max {rot.get_max_val()}")    
 
 # Seznam položek menu
-home_screens = ["Home 0", "Home 1", "Home 2", "Setting screen" ]
+home_screens = ["Home 0", "Home 1", "Home 2", "SS" ]
 ActualScreen = home_screens[0]
-rotary_reset_and_set_to_max(len(home_screens) - 2) # note posledni prvek nesmi byt otacenim dosazitelny
+rotary_reset_and_set_to_max(len(home_screens) - 2) # note posledni prvek nesmi byt otacenim dosazitelny TODO udelat z toho promenou
 
 def map_value(x, in_min, in_max, out_min, out_max):
     return int((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
@@ -108,7 +108,7 @@ def haptic(timer):
         RotaryLastVal = _val
         UpdateLCD = True
         print(f"Rotary value {RotaryLastVal}")
-        if ActualScreen != "Setting menu":
+        if ActualScreen != "SS":
             ActualScreen = home_screens[RotaryLastVal]
 
 
@@ -179,6 +179,7 @@ selected_action = 0
 
 def draw_menu():        
     global UpdateLCD
+    print("draw_menu")
     """ Vykresli aktualni menu na LCD """
     lcd.clear()
     lcd.text(current_menu, 0, 0, 1)
@@ -194,47 +195,50 @@ def navigate_menu():
     """ Posune kurzor nahoru nebo dolu v menu """
     global selected_action
     if UpdateLCD:
-        selected_action = RotaryLastVal #(selected_index + direction) % len(menu[current_menu][:-1])
+        print("navigate_menu")
+        selected_action = RotaryLastVal
         draw_menu()
-        print("Setting menu")
+        
 
 def check_button(_):  
     global current_menu, selected_action, BlockMenu, UpdateLCD, ActualScreen
     if button.value() == 0:
     
         UpdateLCD = True
-
-        if ActualScreen != "Setting screen":
+        print(f"\n-> BTN act_scr {ActualScreen} \t\t\t cur_menu {current_menu} \t\t sel_action {selected_action} ")
+        if ActualScreen != "SS":
             # entry into setting menu
-            ActualScreen = "Setting screen"
+            print("\t BTN if do SS")            
+            ActualScreen = "SS"
             current_menu = "Setting menu"
             selected_action = 0
             rotary_reset_and_set_to_max(len(menu[current_menu]) - 1)
-            draw_menu()
+            #draw_menu()
         else: #je v menu
+            print("BTN else do Setting menu")
             selected_item = menu[current_menu][selected_action]       
             if selected_item == "Zpet":
-                current_menu = "Setting menu"
-                rotary_reset_and_set_to_max(len(menu[current_menu]) - 1)
-                selected_action = 0
-                draw_menu()
+                if current_menu == "Setting menu":
+                    print("naaaaaaaaaaaavrat")
+                    ActualScreen = "Home 0"
+                    rotary_reset_and_set_to_max(len(home_screens) - 2)
+                else:
+                    current_menu = "Setting menu"
+                    rotary_reset_and_set_to_max(len(menu[current_menu]) - 1)
+                    selected_action = 0
+                    #draw_menu()
             elif selected_item in menu:  # Pokud existuje podmenu
                 current_menu = selected_item
                 rotary_reset_and_set_to_max(len(menu[current_menu]) - 1)
-                selected_action = 0
-                draw_menu()
-            elif menu[current_menu] == "Setting menu" and selected_action == menu[current_menu].index("Zpet"):
-                print("navrat?")
-                # navrat zpet na screeny
-                #ActualScreen = home_screens[0]
-                #rotary_reset_and_set_to_max(len(home_screens) - 2)
+                selected_action = 0 #delete ??? vsude???
+                #draw_menu()            
             else:            
                 print("Entry into action")
+        print(f"\n<- BTN act_scr {ActualScreen} \t\t\t cur_menu {current_menu} \t\t sel_action {selected_action} \t UpdateLCD {UpdateLCD}")                
 
 def button_isr(pin):
     global button_debounce_timer
     button_debounce_timer.init(mode=Timer.ONE_SHOT, period=button_debounce_time_ms, callback=check_button)
-
 # Nastaveni preruseni
 button.irq(trigger=Pin.IRQ_FALLING, handler=button_isr)
 
@@ -243,18 +247,19 @@ button.irq(trigger=Pin.IRQ_FALLING, handler=button_isr)
 
 # Hlavni smycka
 while True:    
+    #print(f"while act screen {ActualScreen}")
     if ActualScreen == "Home 0":        
         draw_screens(home_screens.index(ActualScreen))
     elif ActualScreen == "Home 1":        
         draw_screens(home_screens.index(ActualScreen))
     elif ActualScreen == "Home 2":
         draw_screens(home_screens.index(ActualScreen))        
-    elif ActualScreen == "Setting screen":        
+    elif ActualScreen == "SS":        
         navigate_menu()
         #TODO tady vsechny akce!!
     else:
         print("Error actual screen") 
-    time.sleep(0.5)        
+    time.sleep(1)        
 
 """
     if UpdateLCD:
