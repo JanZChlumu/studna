@@ -5,6 +5,9 @@ from rotary_irq_rp2 import RotaryIRQ
 import lcd12864_spi
 from lcd12864_spi import LCD12864_SPI
 import ArialRoundedMT_70pix as BIG_FONT
+import BookAntiqua8CZ as AB8_FONT
+import BookAntiqua24CZ as AB24_FONT
+import BookAntiqua70CZ as AB70_FONT
 
 # Inicializace UART1 pro Raspberry Pi Pico 
 uart1 = UART(1, baudrate=9600, tx=Pin(8), rx=Pin(9))  # Nastav piny dle zapojení
@@ -153,6 +156,17 @@ def draw_bar(fill_percentage):
     lcd.show()
     UpdateLCD = False
 
+def draw_testingFonts():
+    global UpdateLCD
+    if UpdateLCD:
+        lcd.fill(0)
+        lcd.set_font(AB24_FONT)
+        lcd.set_text_wrap()        
+        lcd.draw_text("%ěščřžýá", 0, 0)
+        lcd.show()                        
+        UpdateLCD = False        
+
+
 def draw_screens(screen_id):    
     global UpdateLCD
     if UpdateLCD:          
@@ -290,7 +304,7 @@ while True:
                 map_val = map_value(rot.value(), 0, 5, 0, 100)
                 draw_bar(map_val)
             elif actual_action == "Akce 2 2":
-                pass
+                draw_testingFonts()
             else: 
                 print("While doesn't have action handler")
     else:
