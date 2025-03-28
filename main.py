@@ -224,9 +224,10 @@ def check_button(_):
                 selected_action = 0
                 draw_menu()
             elif menu[current_menu] == "Setting menu" and selected_action == menu[current_menu].index("Zpet"):
+                print("navrat?")
                 # navrat zpet na screeny
-                ActualScreen = home_screens[0]
-                rotary_reset_and_set_to_max(len(home_screens) - 2)
+                #ActualScreen = home_screens[0]
+                #rotary_reset_and_set_to_max(len(home_screens) - 2)
             else:            
                 print("Entry into action")
 
