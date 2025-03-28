@@ -36,18 +36,18 @@ button_debounce_timer = Timer(-1) # -1 means SW timer
 
 led = Pin("LED", Pin.OUT)
 
-def rotary_reset_and_set_to_max(value):
-    global RotaryLastVal
-    rot.reset()
+def rotary_menu_reset_and_set_to_max(value):
+    global RotaryPlausibleVal
+    rot.reset() # = set(value = 0) #toto neni vhodne pro Akce
     rot.set(max_val = value)
-    RotaryLastVal = value
+    RotaryPlausibleVal = value
     #toto pridej global selected_action = 0
     print(f"Rotary reset & set to max {rot.get_max_val()}")    
 
 # Seznam položek menu
 home_screens = ["Home 0", "Home 1", "Home 2", "SS" ]
 ActualScreen = home_screens[0]
-rotary_reset_and_set_to_max(len(home_screens) - 2) # note posledni prvek nesmi byt otacenim dosazitelny TODO udelat z toho promenou
+rotary_menu_reset_and_set_to_max(len(home_screens) - 2) # note posledni prvek nesmi byt otacenim dosazitelny TODO udelat z toho promenou
 
 def map_value(x, in_min, in_max, out_min, out_max):
     return int((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
@@ -102,14 +102,14 @@ def draw_graph():
 HAPTIC Timer call cyclic
 """
 def haptic(timer):    
-    global RotaryLastVal, UpdateLCD, ActualScreen    
+    global RotaryPlausibleVal, UpdateLCD, ActualScreen    
     _val = rot.value()
-    if RotaryLastVal != _val:
-        RotaryLastVal = _val
+    if RotaryPlausibleVal != _val:
+        RotaryPlausibleVal = _val
         UpdateLCD = True
-        print(f"Rotary value {RotaryLastVal}")
+        print(f"Rotary value {RotaryPlausibleVal}")
         if ActualScreen != "SS":
-            ActualScreen = home_screens[RotaryLastVal]
+            ActualScreen = home_screens[RotaryPlausibleVal]
 
 
 hapticTimer = Timer(-1)
@@ -136,6 +136,7 @@ def draw_bar(fill_percentage):
     Args:
     fill_percentage (int): Fill level from 0 to 100
     """
+    global UpdateLCD
     print(fill_percentage)
     #lcd.clear()
     bar_width = 100
@@ -145,11 +146,12 @@ def draw_bar(fill_percentage):
     filled_width = int((fill_percentage / 100) * bar_width)    
     # Draw bar border
     lcd.rect(x_start, y_start, bar_width, bar_height, 1)    
-    # clear
+    # clear - rewrite by white color
     lcd.fill_rect(x_start+1, y_start+1, bar_width-2, bar_height-2, 0)    
     # Draw filled portion
     lcd.fill_rect(x_start, y_start, filled_width, bar_height, 1)    
     lcd.show()
+    UpdateLCD = False
 
 def draw_screens(screen_id):    
     global UpdateLCD
@@ -174,6 +176,10 @@ menu = {
     "Polozka 3": ["Akce 3 1", "Akce 3 2", "Akce 3 3" , "Zpet"]
 }
 
+action_list = {"Akce 1 1" : 11, "Akce 2 2" : 22, "Akce 3 3" : 33}
+actual_action = None
+selected_text = ""
+
 current_menu = "Setting menu"
 selected_action = 0
 
@@ -196,45 +202,66 @@ def navigate_menu():
     global selected_action
     if UpdateLCD:
         print("navigate_menu")
-        selected_action = RotaryLastVal
+        selected_action = RotaryPlausibleVal
         draw_menu()
-        
+
+def entry_action(action):
+    global actual_action
+    #todo read EEPROM
+    lcd.clear()  #delete testing purpose
+    lcd.show()
+    rotary_menu_reset_and_set_to_max(action_list[action])    
+    actual_action = action
+    print(f"Entry action {action}. Rotary max {rot.get_max_val()}") 
+
+
+def leave_action(action):
+    print(f"Leave action {action}")
+    global actual_action
+    actual_action = None
+    #todo save EEPROM
 
 def check_button(_):  
-    global current_menu, selected_action, BlockMenu, UpdateLCD, ActualScreen
-    if button.value() == 0:
-    
+    global current_menu, selected_action, UpdateLCD, ActualScreen, selected_text
+    if button.value() == 0:    
         UpdateLCD = True
-        print(f"\n-> BTN act_scr {ActualScreen} \t\t\t cur_menu {current_menu} \t\t sel_action {selected_action} ")
+        print(f"\n-> BTN act_scr {ActualScreen} | cur_menu {current_menu} | sel_action {selected_action} ")
         if ActualScreen != "SS":
             # entry into setting menu
             print("\t BTN if do SS")            
             ActualScreen = "SS"
             current_menu = "Setting menu"
             selected_action = 0
-            rotary_reset_and_set_to_max(len(menu[current_menu]) - 1)
-            #draw_menu()
-        else: #je v menu
-            print("BTN else do Setting menu")
-            selected_item = menu[current_menu][selected_action]       
-            if selected_item == "Zpet":
-                if current_menu == "Setting menu":
-                    print("naaaaaaaaaaaavrat")
-                    ActualScreen = "Home 0"
-                    rotary_reset_and_set_to_max(len(home_screens) - 2)
-                else:
-                    current_menu = "Setting menu"
-                    rotary_reset_and_set_to_max(len(menu[current_menu]) - 1)
-                    selected_action = 0
-                    #draw_menu()
-            elif selected_item in menu:  # Pokud existuje podmenu
-                current_menu = selected_item
-                rotary_reset_and_set_to_max(len(menu[current_menu]) - 1)
-                selected_action = 0 #delete ??? vsude???
-                #draw_menu()            
-            else:            
-                print("Entry into action")
-        print(f"\n<- BTN act_scr {ActualScreen} \t\t\t cur_menu {current_menu} \t\t sel_action {selected_action} \t UpdateLCD {UpdateLCD}")                
+            rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1)
+            
+        else: #jsme v menu selection
+            if actual_action is None:            
+                print("BTN  Menu selection")
+                selected_text = menu[current_menu][selected_action]       
+                if selected_text == "Zpet":
+                    if current_menu == "Setting menu":  #leave menu
+                        print("naaaaaaaaaaaavrat")
+                        ActualScreen = "Home 0"
+                        rotary_menu_reset_and_set_to_max(len(home_screens) - 2)
+                    else:
+                        current_menu = "Setting menu"
+                        rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1)
+                        selected_action = 0
+                        
+                elif selected_text in menu:  # Pokud existuje podmenu
+                    current_menu = selected_text
+                    rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1)
+                    selected_action = 0 #delete ??? vsude???
+            
+                else:            
+                    print("BTN Entry into action")
+                    entry_action(selected_text)
+            else:
+                print("BTN  Leave Action")
+                rot.set(value = selected_action, max_val = len(menu[current_menu]) - 1)
+                leave_action(selected_text)
+
+        print(f"\n<- BTN act_scr {ActualScreen} | cur_menu {current_menu} | sel_action {selected_action} \t UpdateLCD {UpdateLCD}")                
 
 def button_isr(pin):
     global button_debounce_timer
@@ -255,26 +282,17 @@ while True:
     elif ActualScreen == "Home 2":
         draw_screens(home_screens.index(ActualScreen))        
     elif ActualScreen == "SS":        
-        navigate_menu()
-        #TODO tady vsechny akce!!
+        if actual_action not in action_list:
+            navigate_menu()
+        else:        
+            #TODO tady vsechny akce!!
+            if actual_action == "Akce 1 1":
+                map_val = map_value(rot.value(), 0, 5, 0, 100)
+                draw_bar(map_val)
+            elif actual_action == "Akce 2 2":
+                pass
+            else: 
+                print("While doesn't have action handler")
     else:
         print("Error actual screen") 
-    time.sleep(1)        
-
-"""
-    if UpdateLCD:
-        if BlockMenu:        
-            rot.set(max_val = menu[current_menu][-1])
-            print(f"Rotary set max value {menu[current_menu][-1]}")
-            navigate_menu(RotaryLastVal)
-        else:
-            selected_item = menu[current_menu][selected_index]
-            # tohle nefunguje po startu
-            if selected_item == "Akce 1 1":
-                draw_bar(50)
-        
-        UpdateLCD = False            
-    #if not button.value():  # Kontrola stisknuti tlacitka
-    #    select_item()
-    time.sleep(0.1)  # Debounce
-"""
+    time.sleep(0.1)
