@@ -61,10 +61,27 @@ def rotary_menu_reset_and_set_to_max(value):
     #toto pridej global selected_action = 0
     print(f"Rotary reset & set to max {rot.get_max_val()}")    
 
+# Definice viceurovnoveho menu
+menu = {
+    "Setting menu": ["Hladiny", "Zobrazení", "Info", "Zpět..."],
+    "Hladiny":      ["Min" , "Max", "Zpět..."],
+    "Zobrazení":    ["Graf", "LCD jas", "LCD kontrast", "Zpět..."],
+    "Info":         ["Hist. maxima" , "Zpět..."]
+}
+
+config_data = {"Min": {"rotmax": 20, "val": 21}, "Graf": 21, "LCD jas": 22, "Akce 3 1": 31}
+
+action_list = {"Min" : 11, "LCD jas" : 22, "Hist. maxima" : 33}
+actual_action = None
+selected_text = ""
+
+current_menu = "Setting menu"
+selected_action = 0
+
 # Seznam položek menu
-home_screens = ["Home 0", "Home 1", "Home 2", "SS" ]
-ActualScreen = home_screens[0]
-rotary_menu_reset_and_set_to_max(len(home_screens) - 2) # note posledni prvek nesmi byt otacenim dosazitelny TODO udelat z toho promenou
+home_screens_list = ["Home_%", "Home_cm", "Home_graf", "SS" ]
+ActualHomeScreen = home_screens_list[0]
+rotary_menu_reset_and_set_to_max(len(home_screens_list) - 2) # note posledni prvek nesmi byt otacenim dosazitelny TODO udelat z toho promenou
 
 def map_value(x, in_min, in_max, out_min, out_max):
     return int((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
@@ -119,14 +136,14 @@ def draw_graph():
 HAPTIC Timer call cyclic
 """
 def haptic(timer):    
-    global RotaryPlausibleVal, UpdateLCD, ActualScreen    
+    global RotaryPlausibleVal, UpdateLCD, ActualHomeScreen    
     _val = rot.value()
     if RotaryPlausibleVal != _val:
         RotaryPlausibleVal = _val
         UpdateLCD = True
         print(f"Rotary value {RotaryPlausibleVal}")
-        if ActualScreen != "SS":
-            ActualScreen = home_screens[RotaryPlausibleVal]
+        if ActualHomeScreen != "SS":
+            ActualHomeScreen = home_screens_list[RotaryPlausibleVal]
 
 
 hapticTimer = Timer(-1)
@@ -210,30 +227,13 @@ def draw_screens(screen_id):
         lcd.fill(0)
         lcd.set_font(F80_FONT)
         #lcd.set_text_wrap()
-        lcd.text("Home screen", 0, 0)
-        lcd.draw_text(str(screen_id) + "3%", 0, -5)
+        lcd.text(home_screens_list[screen_id], 0, 0)
+        lcd.draw_text(str(screen_id) + "3%", 0, -10)
         lcd.show()                        
         UpdateLCD = False
         print(f"Home {screen_id}")
 
 pwmLCD.duty_u16(15000)
-
-# Definice viceurovnoveho menu
-menu = {
-    "Setting menu": ["Položka 1", "Položka 2", "Položka 3", "Zpět..."],
-    "Položka 1": ["Akce 1 1", "Zpět..."],
-    "Položka 2": ["Akce 2 1", "Akce 2 2", "Zpět..."],
-    "Položka 3": ["Akce 3 1", "Akce 3 2", "Akce 3 3" , "Zpět..."]
-}
-
-config_data = {"Akce 1 1": {"rotmax": 20, "val": 21}, "Akce 2 1": 21, "Akce 2 2": 22, "Akce 3 1": 31}
-
-action_list = {"Akce 1 1" : 11, "Akce 2 2" : 22, "Akce 3 3" : 33}
-actual_action = None
-selected_text = ""
-
-current_menu = "Setting menu"
-selected_action = 0
 
 def draw_menu():        
     global UpdateLCD
@@ -277,14 +277,14 @@ def leave_action(action):
     UpdateLCD = True
 
 def check_button(_):  
-    global current_menu, selected_action, UpdateLCD, ActualScreen, selected_text
+    global current_menu, selected_action, UpdateLCD, ActualHomeScreen, selected_text
     if button.value() == 0:    
         UpdateLCD = True
-        print(f"\n-> BTN act_scr {ActualScreen} | cur_menu {current_menu} | sel_action {selected_action} ")
-        if ActualScreen != "SS":
+        print(f"\n-> BTN act_scr {ActualHomeScreen} | cur_menu {current_menu} | sel_action {selected_action} ")
+        if ActualHomeScreen != "SS":
             # entry into setting menu
             print("\t BTN if do SS")            
-            ActualScreen = "SS"
+            ActualHomeScreen = "SS"
             current_menu = "Setting menu"
             selected_action = 0
             rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1)
@@ -296,8 +296,8 @@ def check_button(_):
                 if selected_text == "Zpět...":
                     if current_menu == "Setting menu":  #leave menu
                         print("naaaaaaaaaaaavrat")
-                        ActualScreen = "Home 0"
-                        rotary_menu_reset_and_set_to_max(len(home_screens) - 2)
+                        ActualHomeScreen = "Home_%"
+                        rotary_menu_reset_and_set_to_max(len(home_screens_list) - 2)
                     else:
                         current_menu = "Setting menu"
                         rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1)
@@ -316,7 +316,7 @@ def check_button(_):
                 rot.set(value = selected_action, max_val = len(menu[current_menu]) - 1)
                 leave_action(selected_text)
 
-        print(f"\n<- BTN act_scr {ActualScreen} | cur_menu {current_menu} | sel_action {selected_action} \t UpdateLCD {UpdateLCD}")                
+        print(f"\n<- BTN act_scr {ActualHomeScreen} | cur_menu {current_menu} | sel_action {selected_action} \t UpdateLCD {UpdateLCD}")                
 
 def button_isr(pin):
     global button_debounce_timer
@@ -330,23 +330,23 @@ button.irq(trigger=Pin.IRQ_FALLING, handler=button_isr)
 # Hlavni smycka
 while True:    
     #print(f"while act screen {ActualScreen}")
-    if ActualScreen == "Home 0":        
-        draw_screens(home_screens.index(ActualScreen))
-    elif ActualScreen == "Home 1":        
-        draw_screens(home_screens.index(ActualScreen))
-    elif ActualScreen == "Home 2":
-        draw_screens(home_screens.index(ActualScreen))        
-    elif ActualScreen == "SS":        
+    if ActualHomeScreen == "Home_%":        
+        draw_screens(home_screens_list.index(ActualHomeScreen))
+    elif ActualHomeScreen == "Home_cm":        
+        draw_screens(home_screens_list.index(ActualHomeScreen))
+    elif ActualHomeScreen == "Home_graf":
+        draw_screens(home_screens_list.index(ActualHomeScreen))        
+    elif ActualHomeScreen == "SS":        
         if actual_action not in action_list:
             navigate_menu()
         else:        
             #TODO tady vsechny akce!!
-            if actual_action == "Akce 1 1":
+            if actual_action == "Min":
                 map_val = map_value(rot.value(), 0, 5, 0, 100)
                 draw_bar(map_val)
-            elif actual_action == "Akce 2 2":
+            elif actual_action == "LCD jas":
                 draw_testingFonts()
-            elif actual_action == "Akce 3 3":
+            elif actual_action == "Hist. maxima":
                 draw_set_value(actual_action, RotaryPlausibleVal, "cm")    
             else: 
                 print("While doesn't have action handler")
