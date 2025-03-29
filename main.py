@@ -1,6 +1,8 @@
 from machine import Pin, SPI, Timer, PWM, UART
 from utime import sleep
 import time
+import ujson  # JSON pro ukládání strukturovaných dat
+import uos
 from rotary_irq_rp2 import RotaryIRQ
 import lcd12864_spi
 from lcd12864_spi import LCD12864_SPI
@@ -9,6 +11,20 @@ import Calibri16CZ as F16_FONT
 import Calibri24CZ as F24_FONT
 import Calibri36CZ as F36_FONT
 import Calibri80CZ as F80_FONT
+
+FILENAME = "config.json"
+
+def save_config(data):
+    with open(FILENAME, "w") as f:
+        ujson.dump(data, f)
+
+def load_config():
+    try:
+        with open(FILENAME, "r") as f:
+            return ujson.load(f)
+    except OSError:
+        print("File not found")
+        return None  # Soubor neexistuje
 
 # Inicializace UART1 pro Raspberry Pi Pico 
 uart1 = UART(1, baudrate=9600, tx=Pin(8), rx=Pin(9))  # Nastav piny dle zapojení
@@ -26,11 +42,8 @@ UpdateLCD = False
 
 # Inicializace rotačního enkodéru
 rot = RotaryIRQ(pin_num_clk=6, pin_num_dt=7, min_val=0, max_val=5, reverse=False, range_mode=RotaryIRQ.RANGE_WRAP, pull_up=True)
-#RotaryLastVal = 100
-
 """
-ROTARY def set(self, value=None, min_val=None, incr=None,
-            max_val=None, reverse=None, range_mode=None):
+ROTARY def set(self, value=None, min_val=None, incr=None, max_val=None, reverse=None, range_mode=None):
 """
 
 # Inicializace tlačítka potvrzení
@@ -146,12 +159,12 @@ def draw_set_value(desc, value, unit = None):
         lcd.set_font(F16_FONT)
         lcd.set_text_wrap()
         if unit is not None:
-            text = str(value) + " " + unit
+            text = str(value) + unit
         else:
             text = str(value)
         lcd.draw_text("Nastav " + desc, 0, 0)
         lcd.set_font(F36_FONT)
-        lcd.draw_text(text, 20, 20)
+        lcd.draw_text(text, 15, 20)
         lcd.show()
         UpdateLCD = False
 
@@ -198,7 +211,7 @@ def draw_screens(screen_id):
         lcd.set_font(F80_FONT)
         #lcd.set_text_wrap()
         lcd.text("Home screen", 0, 0)
-        lcd.draw_text(str(screen_id) + "3%", 0, 0)
+        lcd.draw_text(str(screen_id) + "3%", 0, -5)
         lcd.show()                        
         UpdateLCD = False
         print(f"Home {screen_id}")
@@ -212,6 +225,8 @@ menu = {
     "Položka 2": ["Akce 2 1", "Akce 2 2", "Zpět..."],
     "Položka 3": ["Akce 3 1", "Akce 3 2", "Akce 3 3" , "Zpět..."]
 }
+
+config_data = {"Akce 1 1": {"rotmax": 20, "val": 21}, "Akce 2 1": 21, "Akce 2 2": 22, "Akce 3 1": 31}
 
 action_list = {"Akce 1 1" : 11, "Akce 2 2" : 22, "Akce 3 3" : 33}
 actual_action = None
@@ -246,8 +261,9 @@ def navigate_menu():
 def entry_action(action):
     global actual_action
     #todo read EEPROM
-    lcd.clear()  #delete testing purpose
-    lcd.show()
+    config_data = load_config()
+    print("Načtený config:", config_data)
+    
     rotary_menu_reset_and_set_to_max(action_list[action])    
     actual_action = action
     print(f"Entry action {action}. Rotary max {rot.get_max_val()}") 

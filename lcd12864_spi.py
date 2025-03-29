@@ -163,6 +163,7 @@ class LCD12864_SPI( FrameBuffer ):
             return False
 
         for char in text:   
+            #print("char", ord(char))
             glyph = font.get_ch(char)
             glyph_height = glyph[1]
             glyph_width  = glyph[2]
