@@ -79,9 +79,9 @@ current_menu = "Setting menu"
 selected_action = 0
 
 # Seznam položek menu
-home_screens_list = ["Home_%", "Home_cm", "Home_graf", "SS" ]
-ActualHomeScreen = home_screens_list[0]
-rotary_menu_reset_and_set_to_max(len(home_screens_list) - 2) # note posledni prvek nesmi byt otacenim dosazitelny TODO udelat z toho promenou
+home_screens_list = ["Home_%", "Home_cm", "Home_graf"]
+ActualHomeScreen = home_screens_list[0] 
+rotary_menu_reset_and_set_to_max(len(home_screens_list) - 1)
 
 def map_value(x, in_min, in_max, out_min, out_max):
     return int((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
@@ -142,7 +142,7 @@ def haptic(timer):
         RotaryPlausibleVal = _val
         UpdateLCD = True
         print(f"Rotary value {RotaryPlausibleVal}")
-        if ActualHomeScreen != "SS":
+        if ActualHomeScreen is not None:
             ActualHomeScreen = home_screens_list[RotaryPlausibleVal]
 
 
@@ -281,10 +281,9 @@ def check_button(_):
     if button.value() == 0:    
         UpdateLCD = True
         print(f"\n-> BTN act_scr {ActualHomeScreen} | cur_menu {current_menu} | sel_action {selected_action} ")
-        if ActualHomeScreen != "SS":
-            # entry into setting menu
-            print("\t BTN if do SS")            
-            ActualHomeScreen = "SS"
+        if ActualHomeScreen is not None:
+            # entry into setting menu            
+            ActualHomeScreen = None
             current_menu = "Setting menu"
             selected_action = 0
             rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1)
@@ -297,7 +296,7 @@ def check_button(_):
                     if current_menu == "Setting menu":  #leave menu
                         print("naaaaaaaaaaaavrat")
                         ActualHomeScreen = "Home_%"
-                        rotary_menu_reset_and_set_to_max(len(home_screens_list) - 2)
+                        rotary_menu_reset_and_set_to_max(len(home_screens_list) - 1)
                     else:
                         current_menu = "Setting menu"
                         rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1)
@@ -336,7 +335,7 @@ while True:
         draw_screens(home_screens_list.index(ActualHomeScreen))
     elif ActualHomeScreen == "Home_graf":
         draw_screens(home_screens_list.index(ActualHomeScreen))        
-    elif ActualHomeScreen == "SS":        
+    elif ActualHomeScreen is None:        
         if actual_action not in action_list:
             navigate_menu()
         else:        
