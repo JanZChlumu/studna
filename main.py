@@ -4,10 +4,11 @@ import time
 from rotary_irq_rp2 import RotaryIRQ
 import lcd12864_spi
 from lcd12864_spi import LCD12864_SPI
-import ArialRoundedMT_70pix as BIG_FONT
-import BookAntiqua8CZ as AB8_FONT
-import BookAntiqua24CZ as AB24_FONT
-import BookAntiqua70CZ as AB70_FONT
+import Calibri10CZ  as F10_FONT
+import Calibri16CZ as F16_FONT
+import Calibri24CZ as F24_FONT
+import Calibri36CZ as F36_FONT
+import Calibri80CZ as F80_FONT
 
 # Inicializace UART1 pro Raspberry Pi Pico 
 uart1 = UART(1, baudrate=9600, tx=Pin(8), rx=Pin(9))  # Nastav piny dle zapojení
@@ -133,6 +134,26 @@ def task1(timer):
 tim = Timer(-1)
 tim.init(period=997, mode=Timer.PERIODIC, callback=task1)
 
+def draw_set_value(desc, value, unit = None):
+    """ Draw a value on the display
+    Args:
+    desc (str): Description of the value
+    value (int): Value to be displayed
+    """
+    global UpdateLCD
+    if UpdateLCD:
+        lcd.clear()
+        lcd.set_font(F16_FONT)
+        lcd.set_text_wrap()
+        if unit is not None:
+            text = str(value) + " " + unit
+        else:
+            text = str(value)
+        lcd.draw_text("Nastav " + desc, 0, 0)
+        lcd.set_font(F36_FONT)
+        lcd.draw_text(text, 20, 20)
+        lcd.show()
+        UpdateLCD = False
 
 def draw_bar(fill_percentage):
     """ Draw a horizontal bar with adjustable fill
@@ -140,54 +161,56 @@ def draw_bar(fill_percentage):
     fill_percentage (int): Fill level from 0 to 100
     """
     global UpdateLCD
-    print(fill_percentage)
-    #lcd.clear()
-    bar_width = 100
-    bar_height = 15
-    x_start = 14
-    y_start = 25
-    filled_width = int((fill_percentage / 100) * bar_width)    
-    # Draw bar border
-    lcd.rect(x_start, y_start, bar_width, bar_height, 1)    
-    # clear - rewrite by white color
-    lcd.fill_rect(x_start+1, y_start+1, bar_width-2, bar_height-2, 0)    
-    # Draw filled portion
-    lcd.fill_rect(x_start, y_start, filled_width, bar_height, 1)    
-    lcd.show()
-    UpdateLCD = False
+    if UpdateLCD:        
+        print(fill_percentage)
+        #lcd.clear()
+        lcd.set_font(F24_FONT)
+        lcd.set_text_wrap()        
+        lcd.draw_text("Nastav jas", 0, 0)
+        bar_width = 100
+        bar_height = 15
+        x_start = 14
+        y_start = 25
+        filled_width = int((fill_percentage / 100) * bar_width)    
+        # Draw bar border
+        lcd.rect(x_start, y_start, bar_width, bar_height, 1)    
+        # clear - rewrite by white color
+        lcd.fill_rect(x_start+1, y_start+1, bar_width-2, bar_height-2, 0)    
+        # Draw filled portion
+        lcd.fill_rect(x_start, y_start, filled_width, bar_height, 1)    
+        lcd.show()
+        UpdateLCD = False
 
 def draw_testingFonts():
     global UpdateLCD
     if UpdateLCD:
         lcd.fill(0)
-        lcd.set_font(AB24_FONT)
+        lcd.set_font(F16_FONT)
         lcd.set_text_wrap()        
-        lcd.draw_text("%ěščřžýá", 0, 0)
+        lcd.draw_text("%ěščřžýá∑∞", 0, 0)
         lcd.show()                        
         UpdateLCD = False        
-
 
 def draw_screens(screen_id):    
     global UpdateLCD
     if UpdateLCD:          
         lcd.fill(0)
-        lcd.set_font(BIG_FONT)
-        lcd.set_text_wrap()
+        lcd.set_font(F80_FONT)
+        #lcd.set_text_wrap()
         lcd.text("Home screen", 0, 0)
-        lcd.draw_text(str(screen_id), 0, 0)
+        lcd.draw_text(str(screen_id) + "3%", 0, 0)
         lcd.show()                        
         UpdateLCD = False
         print(f"Home {screen_id}")
 
 pwmLCD.duty_u16(15000)
 
-
 # Definice viceurovnoveho menu
 menu = {
-    "Setting menu": ["Polozka 1", "Polozka 2", "Polozka 3", "Zpet"],
-    "Polozka 1": ["Akce 1 1", "Zpet"],
-    "Polozka 2": ["Akce 2 1", "Akce 2 2", "Zpet"],
-    "Polozka 3": ["Akce 3 1", "Akce 3 2", "Akce 3 3" , "Zpet"]
+    "Setting menu": ["Položka 1", "Položka 2", "Položka 3", "Zpět..."],
+    "Položka 1": ["Akce 1 1", "Zpět..."],
+    "Položka 2": ["Akce 2 1", "Akce 2 2", "Zpět..."],
+    "Položka 3": ["Akce 3 1", "Akce 3 2", "Akce 3 3" , "Zpět..."]
 }
 
 action_list = {"Akce 1 1" : 11, "Akce 2 2" : 22, "Akce 3 3" : 33}
@@ -202,11 +225,12 @@ def draw_menu():
     print("draw_menu")
     """ Vykresli aktualni menu na LCD """
     lcd.clear()
-    lcd.text(current_menu, 0, 0, 1)
-    
+    lcd.set_font(F16_FONT)
+    lcd.draw_text(current_menu, 0, 0)
+
     for i, item in enumerate(menu[current_menu]):
         prefix = "-> " if i == selected_action else "   "
-        lcd.text(prefix + item, 0, 10 + i * 10, 1)
+        lcd.draw_text(prefix + item, 0, 12 + i * 12)
 
     lcd.show()
     UpdateLCD = False
@@ -228,12 +252,13 @@ def entry_action(action):
     actual_action = action
     print(f"Entry action {action}. Rotary max {rot.get_max_val()}") 
 
-
 def leave_action(action):
+    global UpdateLCD, actual_action
+    
     print(f"Leave action {action}")
-    global actual_action
     actual_action = None
     #todo save EEPROM
+    UpdateLCD = True
 
 def check_button(_):  
     global current_menu, selected_action, UpdateLCD, ActualScreen, selected_text
@@ -252,7 +277,7 @@ def check_button(_):
             if actual_action is None:            
                 print("BTN  Menu selection")
                 selected_text = menu[current_menu][selected_action]       
-                if selected_text == "Zpet":
+                if selected_text == "Zpět...":
                     if current_menu == "Setting menu":  #leave menu
                         print("naaaaaaaaaaaavrat")
                         ActualScreen = "Home 0"
@@ -305,6 +330,8 @@ while True:
                 draw_bar(map_val)
             elif actual_action == "Akce 2 2":
                 draw_testingFonts()
+            elif actual_action == "Akce 3 3":
+                draw_set_value(actual_action, RotaryPlausibleVal, "cm")    
             else: 
                 print("While doesn't have action handler")
     else:
