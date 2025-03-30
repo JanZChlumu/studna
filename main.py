@@ -12,24 +12,126 @@ import Calibri24CZ as F24_FONT
 import Calibri36CZ as F36_FONT
 import Calibri80CZ as F80_FONT
 
-FILENAME = "config.json"
+FILE_CONFIG = "config.json"
+FILE_HISTORY = "hist_data.json"
 
-def save_config(data):
+# Definice viceurovnoveho menu
+menu = {
+    "Setting menu": ["Hladiny", "Zobrazení", "Info", "Zpět..."],
+    "Hladiny":      ["Min" , "Max", "Posun reference", "Zpět..."],
+    "Zobrazení":    ["Graf historie", "LCD jas", "LCD kontrast", "Zpět..."],
+    "Info":         ["Hist. maxima" , "Ulož test. CFG", "Zpět..."]
+}
+# testovací konfigurace pro emulovanou EEPROM
+test_config_data = {"Min":            {"val": 20, "rotmax": 100, "rotstep" : 1, "unit": "cm"},
+                    "Max":            {"val": 40, "rotmax": 200, "rotstep" : 1, "unit": "cm"},
+                    "Posun reference": {"val": 8, "rotmax": 150, "rotstep" : 1, "unit": "mm", "rotmin" : -150},
+                    "Graf historie":  {"val": 0, "rotmax": 2, "rotstep" : 1, "unit": "hodin"},
+                    "LCD jas":        {"val": 2, "rotmax": 10, "rotstep" : 1},
+                    "LCD kontrast":   {"val": 2, "rotmax": 5, "rotstep" : 1}} 
+
+do_action = None
+selected_text = ""
+file_action_value = None
+file_action_rmax = None
+file_action_unit = None
+
+graph_data = {"8h": [], "16h": [], "32h": [], "counter": 0}
+home_screens_show_data = {"dist_cm": -1, "percent": -1}
+
+current_menu = "Setting menu"
+selected_action = 0
+
+# Seznam položek menu
+home_screens_list = ["Home_%", "Home_cm", "Home_graf"]
+ActualHomeScreen = home_screens_list[0] 
+
+hist_data = {"min": 0, "max": 0}
+
+def save_file(file_name, data):
     try:
-        with open(FILENAME, "w") as f:
+        with open(file_name, "w") as f:
             ujson.dump(data, f)
             print("File saved")
     except OSError:
         print("Error saving config")        
 
-def load_config():
+def load_file(file_name):
     try:
-        with open(FILENAME, "r") as f:
-            print("File loaded")
+        with open(file_name, "r") as f:
+            print(f"File loaded {file_name}")
             return ujson.load(f)
     except OSError:
         print("File not found")
         return None  # Soubor neexistuje
+
+print("!!!!!!! test confguration !!!!!!!!!")
+save_file(FILE_CONFIG, test_config_data)    #TOdo remove later
+
+file_ram_shadow_data = {}
+
+def load_cfg_to_shadow_ram(file_data):
+    global file_ram_shadow_data
+    print("load_cfg_for_home_screens")
+    if file_ram_shadow_data is None:
+        file_ram_shadow_data = {"Min": 0, "Max": 0, "GraphHrs": 0, "ReferenceShift": 0}
+    if file_data is not None:
+        try:
+            file_ram_shadow_data["Min"] = file_data["Min"]["val"]
+            file_ram_shadow_data["Max"] = file_data["Max"]["val"]
+            file_ram_shadow_data["GraphHrs"] = file_data["Graf historie"]["val"]
+            file_ram_shadow_data["ReferenceShift"] = file_data["Posun reference"]["val"]            
+        except OSError:
+            print("load_cfg_for_home_screens | no key found")
+ 
+load_cfg_to_shadow_ram(load_file(FILE_CONFIG))
+
+def load_history_info(file_data):
+    global hist_data    
+    print("load_history_info")
+    if hist_data is None:
+        hist_data = {"min": 0, "max": 0}
+    if file_data is None:
+        # Pokud soubor neexistuje, vytvoř nový
+        file_data = {"min_vody": 0, "max_vody": 0}
+        save_file(FILE_HISTORY, file_data)
+        hist_data["min"] = 0
+        hist_data["max"] = 0
+    else:
+        try:
+            hist_data["min"] = file_data["min_vody"]
+            hist_data["max"] = file_data["max_vody"]
+        except OSError:
+            print("load_history_info | no key found")
+    
+load_history_info(load_file(FILE_HISTORY)) #INIT
+
+def save_history_info():
+    global hist_data
+    if hist_data is not None:
+        file_data = load_file(FILE_HISTORY)
+        if file_data is None:
+            # Pokud soubor neexistuje, vytvoř nový
+            file_data = {"min_vody" : hist_data["min"], "max_vody" : hist_data["max"]}
+        else:
+            file_data["min_vody"] = hist_data["min"]
+            file_data["max_vody"] = hist_data["max"]
+        save_file(FILE_HISTORY, file_data)
+        print("History saved")
+    
+def update_history_data(distance):
+    global hist_data
+    if distance is not None:
+        _update = False
+        if hist_data["min"] == 0 or distance < hist_data["min"]:
+            hist_data["min"] = distance
+            _update = True
+        if hist_data["max"] == 0 or distance > hist_data["max"]:
+            hist_data["max"] = distance
+            _update = True        
+        if _update:
+            save_history_info()
+            print(f"History updated min {hist_data['min']} max {hist_data['max']}")
 
 # Inicializace UART1 pro Raspberry Pi Pico 
 uart1 = UART(1, baudrate=9600, tx=Pin(8), rx=Pin(9))  # Nastav piny dle zapojení
@@ -61,39 +163,11 @@ led = Pin("LED", Pin.OUT)
 def rotary_menu_reset_and_set_to_max(value):
     global RotaryPlausibleVal
     rot.reset() # = set(value = 0) #toto neni vhodne pro Akce
-    rot.set(max_val = value, incr = 1)
+    rot.set(max_val = value, incr = 1, min_val = 0)
     RotaryPlausibleVal = value #zabrání překreslení LCD
     #toto pridej global selected_action = 0
     print(f"Rotary reset & set to max {rot.get_max_val()}")    
 
-# Definice viceurovnoveho menu
-menu = {
-    "Setting menu": ["Hladiny", "Zobrazení", "Info", "Zpět..."],
-    "Hladiny":      ["Min" , "Max", "Zpět..."],
-    "Zobrazení":    ["Graf historie", "LCD jas", "LCD kontrast", "Zpět..."],
-    "Info":         ["Hist. maxima" , "Ulož test. CFG", "Zpět..."]
-}
-# testovací konfigurace pro emulovanou EEPROM
-test_config_data = {"Min":            {"val": 21, "rotmax": 20, "rotstep" : 1, "unit": "cm"},
-                    "Max":            {"val": 21, "rotmax": 20, "rotstep" : 1, "unit": "cm"},
-                    "Graf historie":  {"val": 2, "rotmax": 24, "rotstep" : 8},
-                    "LCD jas":        {"val": 2, "rotmax": 10, "rotstep" : 1},
-                    "LCD kontrast":   {"val": 2, "rotmax": 5, "rotstep" : 1},
-                    "Hist. maxima":   {"Min": 70, "Max": 123, "unit": "cm"}} 
-               
-#action_list = {"Min" : 11, "LCD jas" : 22, "Hist. maxima" : 33}
-do_action = None
-selected_text = ""
-file_action_value = None
-file_action_rmax = None
-file_action_unit = None
-
-current_menu = "Setting menu"
-selected_action = 0
-
-# Seznam položek menu
-home_screens_list = ["Home_%", "Home_cm", "Home_graf"]
-ActualHomeScreen = home_screens_list[0] 
 rotary_menu_reset_and_set_to_max(len(home_screens_list) - 1)
 
 def map_value(x, in_min, in_max, out_min, out_max):
@@ -113,9 +187,46 @@ def get_distance():
                     print("Invalid result")
                     return None
                 else:
-                    #print(f"Distance [mm]: {distance}")
+                    print(f"Get Distance [mm]: {distance}")
                     return distance
     return None
+
+def draw_home_graph_hrs():
+    global UpdateLCD
+    if UpdateLCD:
+        lcd.clear()    
+        map_hours = {0: "8h", 1: "16h", 2: "32h"}
+        _hr = file_ram_shadow_data["GraphHrs"]
+        if _hr in map_hours: 
+            distances = graph_data[map_hours[_hr]]
+
+            if len(distances) > 0:                
+                min_distance = min(distances)
+                max_distance = max(distances)
+                lcd.text("Max:" + str(max_distance/10) + "cm", 0, 0, 1)
+                lcd.text("Graf " + map_hours[_hr] , 30, 25, 1)    
+                lcd.text("Min: " + str(min_distance/10) + "cm", 0, 60, 1)
+                range_distance = max_distance - min_distance                                
+                
+                # Prevent division by zero if all distances are the same
+                if range_distance == 0:
+                    scale = 63
+                else:
+                    scale = 63 / range_distance
+
+                for i in range(1, len(distances)):
+                    x1 = int((i - 1) * 128 / max_records)
+                    y1 = 63 - int((distances[i - 1] - min_distance) * scale)
+                    x2 = int(i * 128 / max_records)
+                    y2 = 63 - int((distances[i] - min_distance) * scale)
+                    lcd.line(x1, y1, x2, y2, 1)
+            else:
+                lcd.text("Nejsou data pro ", 5, 20, 1)
+                lcd.text( " " + map_hours[_hr] + " graf ", 25, 30, 1)
+        else:
+            print("Invalid key in map_hours")                    
+        lcd.show()
+        UpdateLCD = False
 
 def draw_graph():
     lcd.clear()
@@ -158,26 +269,61 @@ def haptic(timer):
         if ActualHomeScreen is not None:
             ActualHomeScreen = home_screens_list[RotaryPlausibleVal]
 
-
 hapticTimer = Timer(-1)
 hapticTimer.init(period=19, mode=Timer.PERIODIC, callback=haptic) 
 
 def task1(timer):    
-    global UpdateLCD
+    global UpdateLCD, home_screens_show_data
     led.toggle()
-    distance = get_distance()    
-    if distance is not None:        
-        distances.append(distance)
-            
-        if len(distances) > max_records:
-            distances.pop(0)
-    #UpdateLCD = True
-    #draw_graph()            
+    #TODO always check limit - save water level
+    dist_mm = get_distance()
+    if dist_mm is not None:            
+        dist_mm += file_ram_shadow_data["ReferenceShift"]
+        update_history_data(dist_mm) #update history data
+
+        if ActualHomeScreen in home_screens_list:
+            _dist_cm = round(float(dist_mm / 10), 2)
+            _percent = int((((dist_mm/10) - file_ram_shadow_data["Min"]) * 100)/file_ram_shadow_data["Max"])
+            home_screens_show_data = {"dist_cm": _dist_cm, "percent": _percent}
+            print(f"task1 | dist_cm {_dist_cm} | percent {_percent}")
+            UpdateLCD = True    
 
 tim = Timer(-1)
-tim.init(period=997, mode=Timer.PERIODIC, callback=task1)
+tim.init(period=2555, mode=Timer.PERIODIC, callback=task1)
 
-def draw_set_value(desc, value, unit = None):
+def updateGraphData(_):
+    global graph_data
+    print("updateGraphData")
+    _dist = get_distance()
+    _arrray_max = 128
+    if _dist is not None:
+        #8h store
+        graph_data["8h"].append(_dist)
+        if len(graph_data["8h"]) > _arrray_max:
+            graph_data["8h"].pop(0)
+        print("updateGraphData | data 8h", graph_data["8h"]) #TODO tohle ukaze cely list!
+        # 16h store
+        if graph_data["counter"] % 2 == 0:
+            graph_data["16h"].append(_dist)
+            if len(graph_data["16h"]) > _arrray_max:    
+                graph_data["16h"].pop(0)
+            print("updateGraphData | data 16h", graph_data["16h"])
+        # 32h store
+        if graph_data["counter"] % 4 == 0:
+            graph_data["32h"].append(_dist)
+            if len(graph_data["32h"]) > _arrray_max:    
+                graph_data["32h"].pop(0)
+            print("updateGraphData | data 32h", graph_data["32h"])
+    graph_data["counter"] += 1
+
+"""
+Historie pro grafy se ukládá jen v ram. LCD má rozlišení 128x64 pixelů, takže max 128 bodů uložíme pro každý graf.
+Pro 8h graf uložíme hodnotu každých 225 sec, pro 16h graf každých 450 sec a pro 32h graf každých 900 sec.
+"""
+timStoreGraph = Timer(-1)
+timStoreGraph.init(period=1000*225, mode=Timer.PERIODIC, callback=updateGraphData)
+
+def draw_action_set_value(desc, value, unit = None):
     """ Draw a value on the display
     Args:
     desc (str): Description of the value
@@ -192,13 +338,21 @@ def draw_set_value(desc, value, unit = None):
             text = str(value) + unit
         else:
             text = str(value)
-        lcd.draw_text("Nastav " + desc, 0, 0)
+        lcd.draw_text(desc, 0, 0)
         lcd.set_font(F36_FONT)
-        lcd.draw_text(text, 15, 20)
+        lcd.draw_text(text, 5, 20)
         lcd.show()
         UpdateLCD = False
 
-def draw_bar(fill_percentage):
+def draw_action_graph_time_base(desc, value, unit = None):
+    try:
+        map_hours = {0: 8, 1: 16, 2: 32}
+    except KeyError:
+        value = 0  # Default value if key is not found        
+        print("Invalid key in map_hours")
+    draw_action_set_value(desc, map_hours[value], unit)
+
+def draw_action_bar(fill_percentage):
     """ Draw a horizontal bar with adjustable fill
     Args:
     fill_percentage (int): Fill level from 0 to 100
@@ -224,6 +378,7 @@ def draw_bar(fill_percentage):
         lcd.show()
         UpdateLCD = False
 
+
 def draw_testingFonts():
     global UpdateLCD
     if UpdateLCD:
@@ -234,10 +389,23 @@ def draw_testingFonts():
         lcd.show()                        
         UpdateLCD = False        
 
+def draw_action_info_history_extrems():
+    global UpdateLCD    
+    if UpdateLCD:
+        lcd.fill(0)
+        lcd.set_font(F16_FONT)
+        lcd.set_text_wrap()
+        lcd.draw_text("Historické extrémy", 0, 0)        
+        lcd.draw_text("Min : " + str(hist_data["min"]/1000) + " m", 0, 20)
+        lcd.draw_text("Max : " + str(hist_data["max"]/1000) + " m", 0, 30)
+        lcd.show()                        
+        UpdateLCD = False
+        print("draw_history_maximums")
+
 def draw_screens(screen_id):    
     global UpdateLCD
     if UpdateLCD:          
-        lcd.fill(0)
+        lcd.fill(0)        
         lcd.set_font(F80_FONT)
         #lcd.set_text_wrap()
         lcd.text(home_screens_list[screen_id], 0, 0)
@@ -245,6 +413,28 @@ def draw_screens(screen_id):
         lcd.show()                        
         UpdateLCD = False
         print(f"Home {screen_id}")
+
+def draw_home_screen_cm():
+    global UpdateLCD
+    if UpdateLCD:
+        lcd.fill(0)        
+        lcd.set_font(F16_FONT)        
+        lcd.draw_text("Výška hladiny", 0, 0)
+        lcd.set_font(F36_FONT)        
+        lcd.draw_text(str(home_screens_show_data["dist_cm"]) + "cm", 0, 15)
+        lcd.show()                        
+        UpdateLCD = False
+
+def draw_home_screen_percent():
+    global UpdateLCD
+    if UpdateLCD:
+        lcd.fill(0)        
+        lcd.set_font(F16_FONT)        
+        lcd.draw_text("V zásobě (v %)", 0, 0)
+        lcd.set_font(F80_FONT)        
+        lcd.draw_text(str(home_screens_show_data["percent"]) + "%", 0, -5)
+        lcd.show()                        
+        UpdateLCD = False
 
 pwmLCD.duty_u16(15000)
 
@@ -272,12 +462,12 @@ def navigate_menu():
         draw_menu()
 
 def entry_action(action):
-    global do_action, file_action_value, file_action_unit, file_action_rmax
+    global do_action, file_action_value, file_action_unit, file_action_rmax, RotaryPlausibleVal
     if action == "Ulož test. CFG":
-        save_config(test_config_data)    #TOdo remove later
+        save_file(FILE_CONFIG, test_config_data)    #TOdo remove later
         print("TEST TEST TEST Save config")
         return            
-    cfg = load_config()
+    cfg = load_file(FILE_CONFIG)
     if cfg is None:
         print("Error loading config")
         do_action = None
@@ -286,16 +476,21 @@ def entry_action(action):
         lcd.clear()
         #print(f"\n\n entry action | loaded cfg {cfg}.")
         try:
-            file_action_rmax = cfg[action]["rotmax"]
-            step = cfg[action]["rotstep"]
-            file_action_value = cfg[action]["val"]
-            rot.set(value = file_action_value, max_val = file_action_rmax, incr = step) # nastaveni max a krok
-            RotaryPlausibleVal = file_action_value
-            print(f"entry action {action} | file load: file_action_value {file_action_value}, rmax {file_action_rmax}, step {step}.")
-            if "unit" in cfg[action]:
-                file_action_unit = cfg[action]["unit"]
-            else:
-                file_action_unit = None
+            if action in cfg:
+                file_action_rmax = cfg[action]["rotmax"]
+                file_action_value = cfg[action]["val"]
+                RotaryPlausibleVal = file_action_value
+                step = cfg[action]["rotstep"]
+                rot.set(value = file_action_value, max_val = file_action_rmax, incr = step)
+                print(f"entry action {action} | file load: file_action_value {file_action_value}, rmax {file_action_rmax}, step {step}.")
+                
+                # non standard keys...
+                if "unit" in cfg[action]:
+                    file_action_unit = cfg[action]["unit"]
+                else:
+                    file_action_unit = None
+                if "rotmin" in cfg[action]:
+                    rot.set(min_val = cfg[action]["rotmin"])
         except OSError:
             print("Klic neni nenalezen") # pouzij defaultni hodnoty z menu
             file_action_rmax = len(menu[current_menu]) - 1        
@@ -309,17 +504,22 @@ def entry_action(action):
 def leave_action(action, rot_val, rot_max):
     global UpdateLCD, do_action, file_action_value, file_action_unit, file_action_rmax
     
-    rot.set(value = rot_val, max_val = rot_max, incr = 1)
+    rot.set(value = rot_val, max_val = rot_max, incr = 1, min_val = 0)
     do_action = None
     UpdateLCD = True
     # ulož novou hodnotu
-    cfg = load_config()
+    cfg = load_file(FILE_CONFIG)
     if cfg is not None: # redundantni check bylo overeno v entry_action
-        cfg[action]["val"] = RotaryPlausibleVal 
-        save_config(cfg)  # Uložení změněné hodnoty do souboru
-        print(f"Leave action {action} | stored file_action_value {RotaryPlausibleVal} ")
+        if action in cfg:
+            cfg[action]["val"] = RotaryPlausibleVal
+            save_file(FILE_CONFIG, cfg)  # Uložení změněné hodnoty do souboru
+            print(f"Leave action {action} | stored file_action_value {RotaryPlausibleVal} ")
+        else:
+            print("Leave action | Witout storage")
     else:
         print("Leave action | Error loading config")
+    
+    load_cfg_to_shadow_ram(load_file(FILE_CONFIG)) #update shadow ram
     #clean variables
     file_action_value = None
     file_action_unit = None
@@ -357,7 +557,7 @@ def check_button(_):
                     selected_action = 0 #delete ??? vsude???
             
                 else:            
-                    print("BTN Entry into action")
+                    print(f"BTN Entry into action {selected_text}")
                     entry_action(selected_text)
             else:
                 print("BTN  Leave Action")                
@@ -373,30 +573,34 @@ def button_isr(pin):
 # Nastaveni preruseni
 button.irq(trigger=Pin.IRQ_FALLING, handler=button_isr)
 
-
 # Hlavni smycka
 while True:    
     #print(f"while act screen {ActualScreen}")
     if ActualHomeScreen == "Home_%":        
-        draw_screens(home_screens_list.index(ActualHomeScreen))
+        draw_home_screen_percent()
+        #draw_screens(home_screens_list.index(ActualHomeScreen))
     elif ActualHomeScreen == "Home_cm":        
-        draw_screens(home_screens_list.index(ActualHomeScreen))
+        draw_home_screen_cm()
+        #draw_screens(home_screens_list.index(ActualHomeScreen))
     elif ActualHomeScreen == "Home_graf":
-        draw_screens(home_screens_list.index(ActualHomeScreen))        
+        draw_home_graph_hrs()
+        #draw_screens(home_screens_list.index(ActualHomeScreen))        
     elif ActualHomeScreen is None:        
         if do_action is None:
             navigate_menu()
         else:        
             #TODO tady vsechny akce!!
-            if do_action == "Max":
-                draw_set_value(do_action, RotaryPlausibleVal, file_action_unit)    
-            elif do_action == "LCD jas":
+            if do_action == "Max" or do_action == "Min" or do_action == "Posun reference":
+                draw_action_set_value(do_action, RotaryPlausibleVal, file_action_unit)    
+            elif do_action == "LCD jas" or do_action == "LCD kontrast":
                 map_val = map_value(RotaryPlausibleVal, 0, file_action_rmax, 0, 100)
-                draw_bar(map_val)            
+                draw_action_bar(map_val)            
             elif do_action == "Hist. maxima":
-                draw_testingFonts()
+                draw_action_info_history_extrems()
             elif do_action == "Ulož test. CFG":
-                save_config(test_config_data)    
+                save_file(FILE_CONFIG, test_config_data)
+            elif do_action == "Graf historie":
+                draw_action_graph_time_base(do_action, RotaryPlausibleVal, file_action_unit)
             else: 
                 print("While doesn't have action handler")
                 do_action = None
