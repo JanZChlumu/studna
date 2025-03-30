@@ -15,12 +15,17 @@ import Calibri80CZ as F80_FONT
 FILENAME = "config.json"
 
 def save_config(data):
-    with open(FILENAME, "w") as f:
-        ujson.dump(data, f)
+    try:
+        with open(FILENAME, "w") as f:
+            ujson.dump(data, f)
+            print("File saved")
+    except OSError:
+        print("Error saving config")        
 
 def load_config():
     try:
         with open(FILENAME, "r") as f:
+            print("File loaded")
             return ujson.load(f)
     except OSError:
         print("File not found")
@@ -56,8 +61,8 @@ led = Pin("LED", Pin.OUT)
 def rotary_menu_reset_and_set_to_max(value):
     global RotaryPlausibleVal
     rot.reset() # = set(value = 0) #toto neni vhodne pro Akce
-    rot.set(max_val = value)
-    RotaryPlausibleVal = value
+    rot.set(max_val = value, incr = 1)
+    RotaryPlausibleVal = value #zabrání překreslení LCD
     #toto pridej global selected_action = 0
     print(f"Rotary reset & set to max {rot.get_max_val()}")    
 
@@ -65,15 +70,23 @@ def rotary_menu_reset_and_set_to_max(value):
 menu = {
     "Setting menu": ["Hladiny", "Zobrazení", "Info", "Zpět..."],
     "Hladiny":      ["Min" , "Max", "Zpět..."],
-    "Zobrazení":    ["Graf", "LCD jas", "LCD kontrast", "Zpět..."],
-    "Info":         ["Hist. maxima" , "Zpět..."]
+    "Zobrazení":    ["Graf historie", "LCD jas", "LCD kontrast", "Zpět..."],
+    "Info":         ["Hist. maxima" , "Ulož test. CFG", "Zpět..."]
 }
-
-config_data = {"Min": {"rotmax": 20, "val": 21}, "Graf": 21, "LCD jas": 22, "Akce 3 1": 31}
-
-action_list = {"Min" : 11, "LCD jas" : 22, "Hist. maxima" : 33}
-actual_action = None
+# testovací konfigurace pro emulovanou EEPROM
+test_config_data = {"Min":            {"val": 21, "rotmax": 20, "rotstep" : 1, "unit": "cm"},
+                    "Max":            {"val": 21, "rotmax": 20, "rotstep" : 1, "unit": "cm"},
+                    "Graf historie":  {"val": 2, "rotmax": 24, "rotstep" : 8},
+                    "LCD jas":        {"val": 2, "rotmax": 10, "rotstep" : 1},
+                    "LCD kontrast":   {"val": 2, "rotmax": 5, "rotstep" : 1},
+                    "Hist. maxima":   {"Min": 70, "Max": 123, "unit": "cm"}} 
+               
+#action_list = {"Min" : 11, "LCD jas" : 22, "Hist. maxima" : 33}
+do_action = None
 selected_text = ""
+file_action_value = None
+file_action_rmax = None
+file_action_unit = None
 
 current_menu = "Setting menu"
 selected_action = 0
@@ -141,7 +154,7 @@ def haptic(timer):
     if RotaryPlausibleVal != _val:
         RotaryPlausibleVal = _val
         UpdateLCD = True
-        print(f"Rotary value {RotaryPlausibleVal}")
+        print(f"Rotary value {RotaryPlausibleVal} | max {rot.get_max_val()}")
         if ActualHomeScreen is not None:
             ActualHomeScreen = home_screens_list[RotaryPlausibleVal]
 
@@ -217,7 +230,7 @@ def draw_testingFonts():
         lcd.fill(0)
         lcd.set_font(F16_FONT)
         lcd.set_text_wrap()        
-        lcd.draw_text("%ěščřžýá∑∞", 0, 0)
+        lcd.draw_text("Historická data %ěščřžýá∑∞", 0, 0)
         lcd.show()                        
         UpdateLCD = False        
 
@@ -237,7 +250,7 @@ pwmLCD.duty_u16(15000)
 
 def draw_menu():        
     global UpdateLCD
-    print("draw_menu")
+    #print("draw_menu")
     """ Vykresli aktualni menu na LCD """
     lcd.clear()
     lcd.set_font(F16_FONT)
@@ -259,28 +272,64 @@ def navigate_menu():
         draw_menu()
 
 def entry_action(action):
-    global actual_action
-    #todo read EEPROM
-    config_data = load_config()
-    print("Načtený config:", config_data)
-    
-    rotary_menu_reset_and_set_to_max(action_list[action])    
-    actual_action = action
-    print(f"Entry action {action}. Rotary max {rot.get_max_val()}") 
+    global do_action, file_action_value, file_action_unit, file_action_rmax
+    if action == "Ulož test. CFG":
+        save_config(test_config_data)    #TOdo remove later
+        print("TEST TEST TEST Save config")
+        return            
+    cfg = load_config()
+    if cfg is None:
+        print("Error loading config")
+        do_action = None
+        rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1) #reset to menu
+    else:
+        lcd.clear()
+        #print(f"\n\n entry action | loaded cfg {cfg}.")
+        try:
+            file_action_rmax = cfg[action]["rotmax"]
+            step = cfg[action]["rotstep"]
+            file_action_value = cfg[action]["val"]
+            rot.set(value = file_action_value, max_val = file_action_rmax, incr = step) # nastaveni max a krok
+            RotaryPlausibleVal = file_action_value
+            print(f"entry action {action} | file load: file_action_value {file_action_value}, rmax {file_action_rmax}, step {step}.")
+            if "unit" in cfg[action]:
+                file_action_unit = cfg[action]["unit"]
+            else:
+                file_action_unit = None
+        except OSError:
+            print("Klic neni nenalezen") # pouzij defaultni hodnoty z menu
+            file_action_rmax = len(menu[current_menu]) - 1        
+            rotary_menu_reset_and_set_to_max(file_action_rmax)
+            file_action_value = None    
+        
+        do_action = action
+        print(f"Entry action {action}. Rotary max {rot.get_max_val()}") 
 
-def leave_action(action):
-    global UpdateLCD, actual_action
+
+def leave_action(action, rot_val, rot_max):
+    global UpdateLCD, do_action, file_action_value, file_action_unit, file_action_rmax
     
-    print(f"Leave action {action}")
-    actual_action = None
-    #todo save EEPROM
+    rot.set(value = rot_val, max_val = rot_max, incr = 1)
+    do_action = None
     UpdateLCD = True
+    # ulož novou hodnotu
+    cfg = load_config()
+    if cfg is not None: # redundantni check bylo overeno v entry_action
+        cfg[action]["val"] = RotaryPlausibleVal 
+        save_config(cfg)  # Uložení změněné hodnoty do souboru
+        print(f"Leave action {action} | stored file_action_value {RotaryPlausibleVal} ")
+    else:
+        print("Leave action | Error loading config")
+    #clean variables
+    file_action_value = None
+    file_action_unit = None
+    file_action_rmax = None
 
 def check_button(_):  
     global current_menu, selected_action, UpdateLCD, ActualHomeScreen, selected_text
     if button.value() == 0:    
         UpdateLCD = True
-        print(f"\n-> BTN act_scr {ActualHomeScreen} | cur_menu {current_menu} | sel_action {selected_action} ")
+        print(f"-> BTN ActualHomeScreen {ActualHomeScreen} | cur_menu {current_menu} | sel_action {selected_action} ")
         if ActualHomeScreen is not None:
             # entry into setting menu            
             ActualHomeScreen = None
@@ -289,7 +338,7 @@ def check_button(_):
             rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1)
             
         else: #jsme v menu selection
-            if actual_action is None:            
+            if do_action is None:            
                 print("BTN  Menu selection")
                 selected_text = menu[current_menu][selected_action]       
                 if selected_text == "Zpět...":
@@ -311,11 +360,12 @@ def check_button(_):
                     print("BTN Entry into action")
                     entry_action(selected_text)
             else:
-                print("BTN  Leave Action")
-                rot.set(value = selected_action, max_val = len(menu[current_menu]) - 1)
-                leave_action(selected_text)
+                print("BTN  Leave Action")                
+                _rot_last_in_menu = selected_action
+                _rot_max = len(menu[current_menu]) - 1
+                leave_action(selected_text, _rot_last_in_menu, _rot_max)
 
-        print(f"\n<- BTN act_scr {ActualHomeScreen} | cur_menu {current_menu} | sel_action {selected_action} \t UpdateLCD {UpdateLCD}")                
+        print(f"<- BTN ActualHomeScreen {ActualHomeScreen} | cur_menu {current_menu} | sel_action {selected_action} | UpdateLCD {UpdateLCD}.")                
 
 def button_isr(pin):
     global button_debounce_timer
@@ -323,8 +373,6 @@ def button_isr(pin):
 # Nastaveni preruseni
 button.irq(trigger=Pin.IRQ_FALLING, handler=button_isr)
 
-# Zobrazeni menu pri startu
-#draw_menu()
 
 # Hlavni smycka
 while True:    
@@ -336,19 +384,24 @@ while True:
     elif ActualHomeScreen == "Home_graf":
         draw_screens(home_screens_list.index(ActualHomeScreen))        
     elif ActualHomeScreen is None:        
-        if actual_action not in action_list:
+        if do_action is None:
             navigate_menu()
         else:        
             #TODO tady vsechny akce!!
-            if actual_action == "Min":
-                map_val = map_value(rot.value(), 0, 5, 0, 100)
-                draw_bar(map_val)
-            elif actual_action == "LCD jas":
+            if do_action == "Max":
+                draw_set_value(do_action, RotaryPlausibleVal, file_action_unit)    
+            elif do_action == "LCD jas":
+                map_val = map_value(RotaryPlausibleVal, 0, file_action_rmax, 0, 100)
+                draw_bar(map_val)            
+            elif do_action == "Hist. maxima":
                 draw_testingFonts()
-            elif actual_action == "Hist. maxima":
-                draw_set_value(actual_action, RotaryPlausibleVal, "cm")    
+            elif do_action == "Ulož test. CFG":
+                save_config(test_config_data)    
             else: 
                 print("While doesn't have action handler")
+                do_action = None
+                rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1)
+                UpdateLCD = True
     else:
         print("Error actual screen") 
     time.sleep(0.1)
