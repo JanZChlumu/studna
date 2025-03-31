@@ -145,15 +145,17 @@ class LCD12864_SPI( FrameBuffer ):
         """ Set text wrapping """
         self.text_wrap = bool(on)
 
-    def draw_text(self, text, x, y, color = 1):
+    def draw_text(self, text, x, y, color=1, center_x=False):
         """ Draw text on display
         Args
-        x (int) : Start X position
-        y (int) : Start Y position
+        text (str): Text to display
+        x (int): Start X position (ignored if center_x is True)
+        y (int): Start Y position
+        color (int): Color of the text
+        center_x (bool): Whether to center the text in the x-axis
         """
         x_start = x
-        screen_height = self.height
-        screen_width  = self.width
+        screen_width = self.width
 
         font = self.font
         wrap = self.text_wrap
@@ -162,24 +164,25 @@ class LCD12864_SPI( FrameBuffer ):
             print("Font not set")
             return False
 
-        for char in text:   
-            #print("char", ord(char))
+        # Calculate total text width if centering is enabled
+        if center_x:
+            total_width = sum(font.get_ch(char)[2] for char in text)
+            x_start = (screen_width - total_width) // 2
+
+        for char in text:
             glyph = font.get_ch(char)
             glyph_height = glyph[1]
-            glyph_width  = glyph[2]
-            
-            if char == " ": # double size for space
-                x += glyph_width            
+            glyph_width = glyph[2]
 
-            if wrap and (x + glyph_width > screen_width): # End of row
-                x = x_start
+            if char == " ":  # double size for space
+                x_start += glyph_width
+
+            if wrap and (x_start + glyph_width > screen_width):  # End of row
+                x_start = x
                 y += glyph_height
 
-            #if y + glyph_height > screen_height: # End of screen
-            #    break
-            
-            self.draw_bitmap(glyph, x, y, color)
-            x += glyph_width
+            self.draw_bitmap(glyph, x_start, y, color)
+            x_start += glyph_width
 
     def draw_bitmap(self, bitmap, x, y, color = 1):
         """ Draw a bitmap on display
@@ -232,4 +235,4 @@ class LCD12864_SPI( FrameBuffer ):
 
             self.spi.write( row_buffer )
 
-        self.cs.value( 0 )               
+        self.cs.value( 0 )

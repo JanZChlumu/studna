@@ -341,7 +341,7 @@ def draw_action_set_value(desc, value, unit = None):
             text = str(value)
         lcd.draw_text(desc, 0, 0)
         lcd.set_font(F36_FONT)
-        lcd.draw_text(text, 5, 20)
+        lcd.draw_text(text, 5, 20, center_x=True)
         lcd.show()
         UpdateLCD = False
 
@@ -426,7 +426,7 @@ def draw_home_screen_cm():
         lcd.set_font(F16_FONT)        
         lcd.draw_text("Výška hladiny", 0, 0)
         lcd.set_font(F36_FONT)        
-        lcd.draw_text(str(home_screens_show_data["dist_cm"]) + "cm", 0, 15)
+        lcd.draw_text(str(home_screens_show_data["dist_cm"]) + "cm", 0, 15, center_x=True)
         lcd.show()                        
         UpdateLCD = False
 
@@ -437,7 +437,7 @@ def draw_home_screen_percent():
         lcd.set_font(F16_FONT)        
         lcd.draw_text("V zásobě (v %)", 5, -8)
         lcd.set_font(F80_FONT)        
-        lcd.draw_text(str(home_screens_show_data["percent"]) + "%", 0, -8)
+        lcd.draw_text(str(home_screens_show_data["percent"]) + "%", 0, -8, center_x=True)
         lcd.show()                        
         UpdateLCD = False
 
