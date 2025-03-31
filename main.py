@@ -7,6 +7,7 @@ from rotary_irq_rp2 import RotaryIRQ
 import lcd12864_spi
 from lcd12864_spi import LCD12864_SPI
 import Calibri10CZ  as F10_FONT
+import Calibri12CZ  as F12_FONT
 import Calibri16CZ as F16_FONT
 import Calibri24CZ as F24_FONT
 import Calibri36CZ as F36_FONT
@@ -66,8 +67,8 @@ def load_file(file_name):
         print("File not found")
         return None  # Soubor neexistuje
 
-print("!!!!!!! test confguration !!!!!!!!!")
-save_file(FILE_CONFIG, test_config_data)    #TOdo remove later
+#print("!!!!!!! test confguration !!!!!!!!!")
+#save_file(FILE_CONFIG, test_config_data)    #TOdo remove later
 
 file_ram_shadow_data = {}
 
@@ -151,9 +152,6 @@ UpdateLCD = False
 
 # Inicializace rotačního enkodéru
 rot = RotaryIRQ(pin_num_clk=6, pin_num_dt=7, min_val=0, max_val=5, reverse=False, range_mode=RotaryIRQ.RANGE_WRAP, pull_up=True)
-"""
-ROTARY def set(self, value=None, min_val=None, incr=None, max_val=None, reverse=None, range_mode=None):
-"""
 
 # Inicializace tlačítka potvrzení
 button = Pin(14, Pin.IN, Pin.PULL_UP)
@@ -214,7 +212,7 @@ def get_distance():
 def draw_home_graph_hrs():
     global UpdateLCD
     if UpdateLCD:
-        lcd.clear()    
+        lcd.fill(0)    
         map_hours = {0: "8h", 1: "16h", 2: "32h"}
         _hr = file_ram_shadow_data["GraphHrs"]
         if _hr in map_hours: 
@@ -237,10 +235,10 @@ def draw_home_graph_hrs():
                     y2 = 63 - int((distances[i] - min_distance) * scale)
                     lcd.line(x1, y1, x2, y2, 1)
                 # write over graph
-                lcd.set_font(F16_FONT)
-                lcd.draw_text("Max:" + str(max_distance/10) + "cm", 0, 0)
-                lcd.draw_text("Graf " + map_hours[_hr] , 30, 25)    
-                lcd.draw_text("Min: " + str(min_distance/10) + "cm", 0, 50)
+                lcd.set_font(F12_FONT)
+                lcd.draw_text("Max:" + str(max_distance/10) + "cm", 5, 10, center_x=True, clear_background=True)
+                lcd.draw_text( map_hours[_hr] , 105, 25, clear_background=True)    
+                lcd.draw_text("Min: " + str(min_distance/10) + "cm", 5, 42, center_x=True, clear_background=True)
             else:
                 lcd.text("Nejsou data pro ", 5, 20, 1)
                 lcd.text( " " + map_hours[_hr] + " graf ", 25, 30, 1)
@@ -647,4 +645,4 @@ while True:
                 UpdateLCD = True
     else:
         print("Error actual screen") 
-    time.sleep(0.1)
+    #time.sleep(0.1)
