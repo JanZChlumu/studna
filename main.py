@@ -506,7 +506,7 @@ def entry_action(action):
         print(f"Entry action {action}. Rotary max {rot.get_max_val()}") 
 
 
-def leave_action(action, rot_val, rot_max):
+def leave_action(store_action, restore_rot_val, restore_rot_max):
     global UpdateLCD, do_action, action_tmp_file__unit, action_tmp_file__rmax
     
     UpdateLCD = True
@@ -523,7 +523,7 @@ def leave_action(action, rot_val, rot_max):
             print("History reset!!!")
             return
     
-    rot.set(value = rot_val, max_val = rot_max, incr = 1, min_val = 0)    
+    rot.set(value = restore_rot_val, max_val = restore_rot_max, incr = 1, min_val = 0)    
     do_action = None    
     #clean temp action variables    
     action_tmp_file__unit = None
@@ -533,10 +533,10 @@ def leave_action(action, rot_val, rot_max):
         # save new value to config file
         cfg = load_file(FILE_CONFIG)
         if cfg is not None: # redundantni check bylo overeno v entry_action
-            if action in cfg:
-                cfg[action]["val"] = RotaryPlausibleVal
+            if store_action in cfg:
+                cfg[store_action]["val"] = RotaryPlausibleVal
                 save_file(FILE_CONFIG, cfg)  # Uložení změněné hodnoty do souboru
-                print(f"Leave action {action} | stored RotVal {RotaryPlausibleVal} ")
+                print(f"Leave action {store_action} | stored RotVal {RotaryPlausibleVal} ")
             else:
                 print("Leave action | Witout storage")        
         load_cfg_to_shadow_ram(load_file(FILE_CONFIG)) #update shadow ram
