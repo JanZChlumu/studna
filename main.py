@@ -202,12 +202,7 @@ def draw_home_graph_hrs():
 
             if len(distances) > 0:                
                 min_distance = min(distances)
-                max_distance = max(distances)
-                lcd.set_font(F16_FONT)
-                lcd.draw_text("Max:" + str(max_distance/10) + "cm", 0, 0)
-                lcd.draw_text("Graf " + map_hours[_hr] , 30, 25)    
-                lcd.draw_text("Min: " + str(min_distance/10) + "cm", 0, 50)
-                
+                max_distance = max(distances)                                
                 range_distance = max_distance - min_distance                                                
                 # Prevent division by zero if all distances are the same
                 if range_distance == 0:
@@ -221,6 +216,11 @@ def draw_home_graph_hrs():
                     x2 = int(i * 128 / max_records)
                     y2 = 63 - int((distances[i] - min_distance) * scale)
                     lcd.line(x1, y1, x2, y2, 1)
+                # write over graph
+                lcd.set_font(F16_FONT)
+                lcd.draw_text("Max:" + str(max_distance/10) + "cm", 0, 0)
+                lcd.draw_text("Graf " + map_hours[_hr] , 30, 25)    
+                lcd.draw_text("Min: " + str(min_distance/10) + "cm", 0, 50)
             else:
                 lcd.text("Nejsou data pro ", 5, 20, 1)
                 lcd.text( " " + map_hours[_hr] + " graf ", 25, 30, 1)
@@ -606,7 +606,7 @@ while True:
         if do_action is None:
             navigate_menu()
         else:        
-            #TODO tady vsechny akce!!
+            #ALL actions HERE
             if do_action == "Max" or do_action == "Min" or do_action == "Posun reference":
                 draw_action_set_value(do_action, RotaryPlausibleVal, action_tmp_file__unit)    
             elif do_action == "LCD jas" or do_action == "LCD kontrast":
