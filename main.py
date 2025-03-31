@@ -20,7 +20,7 @@ menu = {
     "Setting menu": ["Hladiny", "Zobrazení", "Info", "Zpět..."],
     "Hladiny":      ["Min" , "Max", "Posun reference", "Zpět..."],
     "Zobrazení":    ["Graf historie", "LCD jas", "LCD kontrast", "Zpět..."],
-    "Info":         ["Hist. maxima" , "RESET Historie" ,"Průměr vzorků", "Zpět..."]
+    "Info":         ["Hist. maxima" , "RESET Historie" ,"Průměruj vzorky", "Zpět..."]
 }
 # testovací konfigurace pro emulovanou EEPROM
 test_config_data = {"Min":             {"val": 20, "rotmax": 100, "rotstep" : 1, "unit": "cm"},
@@ -30,7 +30,7 @@ test_config_data = {"Min":             {"val": 20, "rotmax": 100, "rotstep" : 1,
                     "LCD jas":         {"val": 2, "rotmax": 10, "rotstep" : 1},
                     "LCD kontrast":    {"val": 2, "rotmax": 5, "rotstep" : 1},
                     "RESET Historie":  {"val": 0, "rotmax": 3, "rotstep" : 1},
-                    "Průměr vzorků":   {"val": 1, "rotmax": 7, "rotstep" : 1, "rotmin" : 1, "unit" : "vzorky"}} 
+                    "Průměruj vzorky":   {"val": 1, "rotmax": 7, "rotstep" : 1, "rotmin" : 1, "unit" : "vzorky"}} 
 
 do_action = None # jméno probíhající akce
 selected_text = "" # na tento text ukazuje šipka v menu "->"
@@ -82,7 +82,7 @@ def load_cfg_to_shadow_ram(file_data):
             file_ram_shadow_data["Max"] = file_data["Max"]["val"]
             file_ram_shadow_data["GraphHrs"] = file_data["Graf historie"]["val"]
             file_ram_shadow_data["ReferenceShift"] = file_data["Posun reference"]["val"]
-            file_ram_shadow_data["AvgNo"] = file_data["Průměr vzorků"]["val"]            
+            file_ram_shadow_data["AvgNo"] = file_data["Průměruj vzorky"]["val"]            
         except OSError:
             print("load_cfg_for_home_screens | no key found")
  
@@ -423,7 +423,7 @@ def draw_action_info_history_extrems():
         lcd.draw_text("Historické extrémy", 0, 0)        
         lcd.draw_text("Min : " + str(hist_data_shadow["min"]/1000) + " m", 0, 20)
         lcd.draw_text("Max : " + str(hist_data_shadow["max"]/1000) + " m", 0, 30)
-        lcd.draw_text("Data jsou průměrována z " + str(file_ram_shadow_data["AvgNo"]) + " vzorků", 0, 50)
+        lcd.draw_text("Ø z " + str(file_ram_shadow_data["AvgNo"]) + " vzorků", 0, 50)
         lcd.show()                        
         UpdateLCD = False
         print("draw_history_maximums")
@@ -489,10 +489,7 @@ def navigate_menu():
 
 def entry_action(action):
     global do_action, action_tmp_file__unit, action_tmp_file__rmax, RotaryPlausibleVal
-    if action == "Průměr vzorků":
-        save_file(FILE_CONFIG, test_config_data)    #TOdo remove later
-        print("TEST TEST TEST Save config")
-        return            
+    
     # načti z konfiguračního souboru
     cfg = load_file(FILE_CONFIG)
     if cfg is None:
@@ -631,7 +628,7 @@ while True:
             if do_action == "Max" or \
                do_action == "Min" or \
                do_action == "Posun reference" or \
-               do_action == "Průměr vzorků":
+               do_action == "Průměruj vzorky":
                 draw_action_set_value(do_action, RotaryPlausibleVal, action_tmp_file__unit)    
             elif do_action == "LCD jas" or \
                  do_action == "LCD kontrast":
