@@ -20,7 +20,7 @@ menu = {
     "Setting menu": ["Hladiny", "Zobrazení", "Info", "Zpět..."],
     "Hladiny":      ["Min" , "Max", "Posun reference", "Zpět..."],
     "Zobrazení":    ["Graf historie", "LCD jas", "LCD kontrast", "Zpět..."],
-    "Info":         ["Hist. maxima" , "RESET Historie" ,"Ulož test. CFG", "Zpět..."]
+    "Info":         ["Hist. maxima" , "RESET Historie" ,"Průměr vzorků", "Zpět..."]
 }
 # testovací konfigurace pro emulovanou EEPROM
 test_config_data = {"Min":             {"val": 20, "rotmax": 100, "rotstep" : 1, "unit": "cm"},
@@ -29,7 +29,8 @@ test_config_data = {"Min":             {"val": 20, "rotmax": 100, "rotstep" : 1,
                     "Graf historie":   {"val": 0, "rotmax": 2, "rotstep" : 1, "unit": "hodin"},
                     "LCD jas":         {"val": 2, "rotmax": 10, "rotstep" : 1},
                     "LCD kontrast":    {"val": 2, "rotmax": 5, "rotstep" : 1},
-                    "RESET Historie":  {"val": 0, "rotmax": 3, "rotstep" : 1}} 
+                    "RESET Historie":  {"val": 0, "rotmax": 3, "rotstep" : 1},
+                    "Průměr vzorků":   {"val": 1, "rotmax": 7, "rotstep" : 1, "rotmin" : 1, "unit" : "vzorky"}} 
 
 do_action = None # jméno probíhající akce
 selected_text = "" # na tento text ukazuje šipka v menu "->"
@@ -80,7 +81,8 @@ def load_cfg_to_shadow_ram(file_data):
             file_ram_shadow_data["Min"] = file_data["Min"]["val"]
             file_ram_shadow_data["Max"] = file_data["Max"]["val"]
             file_ram_shadow_data["GraphHrs"] = file_data["Graf historie"]["val"]
-            file_ram_shadow_data["ReferenceShift"] = file_data["Posun reference"]["val"]            
+            file_ram_shadow_data["ReferenceShift"] = file_data["Posun reference"]["val"]
+            file_ram_shadow_data["AvgNo"] = file_data["Průměr vzorků"]["val"]            
         except OSError:
             print("load_cfg_for_home_screens | no key found")
  
@@ -171,9 +173,9 @@ def rotary_menu_reset_and_set_to_max(value):
 rotary_menu_reset_and_set_to_max(len(home_screens_list) - 1)
 
 def map_value(x, in_min, in_max, out_min, out_max):
-    return int((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
+    return int((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)    
 
-def get_distance():
+def measure_ultrasonic():
     uart1.write(b'\x55')  # Odeslání příkazu pro vyčtení dat
     time.sleep(0.05)    
     if uart1.any() >= 4:
@@ -190,6 +192,24 @@ def get_distance():
                     #print(f"Get Distance [mm]: {distance}")
                     return distance
     return None
+
+def get_distance():
+    # average samples
+    if file_ram_shadow_data["AvgNo"] > 1:
+        #print("measure_ultasonic")
+        distances = []
+        for i in range(file_ram_shadow_data["AvgNo"]):
+            dist_mm = measure_ultrasonic()
+            if dist_mm is not None:
+                dist_mm += file_ram_shadow_data["ReferenceShift"]
+                distances.append(dist_mm)
+        if len(distances) > 0:
+            avg = sum(distances) / len(distances)
+            print(f"measure_ultasonic | dist_mm {distances} | avg {avg}")
+            return avg
+    else:
+        # no average samples
+        return measure_ultrasonic()
 
 def draw_home_graph_hrs():
     global UpdateLCD
@@ -403,6 +423,7 @@ def draw_action_info_history_extrems():
         lcd.draw_text("Historické extrémy", 0, 0)        
         lcd.draw_text("Min : " + str(hist_data_shadow["min"]/1000) + " m", 0, 20)
         lcd.draw_text("Max : " + str(hist_data_shadow["max"]/1000) + " m", 0, 30)
+        lcd.draw_text("Data jsou průměrována z " + str(file_ram_shadow_data["AvgNo"]) + " vzorků", 0, 50)
         lcd.show()                        
         UpdateLCD = False
         print("draw_history_maximums")
@@ -468,7 +489,7 @@ def navigate_menu():
 
 def entry_action(action):
     global do_action, action_tmp_file__unit, action_tmp_file__rmax, RotaryPlausibleVal
-    if action == "Ulož test. CFG":
+    if action == "Průměr vzorků":
         save_file(FILE_CONFIG, test_config_data)    #TOdo remove later
         print("TEST TEST TEST Save config")
         return            
@@ -607,15 +628,17 @@ while True:
             navigate_menu()
         else:        
             #ALL actions HERE
-            if do_action == "Max" or do_action == "Min" or do_action == "Posun reference":
+            if do_action == "Max" or \
+               do_action == "Min" or \
+               do_action == "Posun reference" or \
+               do_action == "Průměr vzorků":
                 draw_action_set_value(do_action, RotaryPlausibleVal, action_tmp_file__unit)    
-            elif do_action == "LCD jas" or do_action == "LCD kontrast":
+            elif do_action == "LCD jas" or \
+                 do_action == "LCD kontrast":
                 map_val = map_value(RotaryPlausibleVal, 0, action_tmp_file__rmax, 0, 100)
                 draw_action_bar(map_val)            
             elif do_action == "Hist. maxima":
-                draw_action_info_history_extrems()
-            elif do_action == "Ulož test. CFG":
-                save_file(FILE_CONFIG, test_config_data)
+                draw_action_info_history_extrems()                            
             elif do_action == "Graf historie":
                 draw_action_graph_time_base(do_action, RotaryPlausibleVal, action_tmp_file__unit)
             elif do_action == "RESET Historie":
