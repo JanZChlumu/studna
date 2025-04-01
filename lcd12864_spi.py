@@ -145,7 +145,7 @@ class LCD12864_SPI( FrameBuffer ):
         """ Set text wrapping """
         self.text_wrap = bool(on)
 
-    def draw_text(self, text, x, y, color=1, center_x=False):
+    def draw_text(self, text, x, y, color=1, center_x=False, clear_background=False):
         """ Draw text on display
         Args
         text (str): Text to display
@@ -153,6 +153,7 @@ class LCD12864_SPI( FrameBuffer ):
         y (int): Start Y position
         color (int): Color of the text
         center_x (bool): Whether to center the text in the x-axis
+        clear_background (bool): Whether to clear the background before drawing text
         """
         x_start = x
         screen_width = self.width
@@ -168,6 +169,12 @@ class LCD12864_SPI( FrameBuffer ):
         if center_x:
             total_width = sum(font.get_ch(char)[2] for char in text)
             x_start = (screen_width - total_width) // 2
+
+        # Clear background if requested
+        if clear_background:
+            total_width = sum(font.get_ch(char)[2] for char in text)
+            text_height = font.get_ch(text[0])[1] if text else 0
+            self.fill_rect(x_start, y, total_width, text_height, 0)
 
         for char in text:
             glyph = font.get_ch(char)
