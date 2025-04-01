@@ -13,6 +13,22 @@ import Calibri24CZ as F24_FONT
 import Calibri36CZ as F36_FONT
 import Calibri80CZ as F80_FONT
 
+
+semaphore = 1  # Binární semafor (1 = volný, 0 = obsazený)
+
+def acquire_semaphore():
+    """Pokud je semafor volný (1), nastavíme ho na obsazený (0) a vrátíme True."""
+    global semaphore
+    if semaphore == 1:
+        semaphore = 0
+        return True
+    return False
+
+def release_semaphore():
+    """Uvolní semafor (nastaví na 1)."""
+    global semaphore
+    semaphore = 1
+
 FILE_CONFIG = "config.json"
 FILE_HISTORY = "hist_data.json"
 
@@ -174,22 +190,27 @@ def map_value(x, in_min, in_max, out_min, out_max):
     return int((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)    
 
 def measure_ultrasonic():
-    uart1.write(b'\x55')  # Odeslání příkazu pro vyčtení dat
-    time.sleep(0.05)    
+    if not acquire_semaphore():  
+        return None  # Pokud je semafor obsazený, měření neproběhne
+
+    uart1.write(b'\x55')  # Odeslání příkazu pro měření
+    time.sleep(0.05)  # Krátká pauza (2 ms)
+
+    distance = None
     if uart1.any() >= 4:
         start_byte = uart1.read(1)
         if start_byte == b'\xff':
             data = uart1.read(3)
             if data and len(data) == 3:
                 h_data, l_data, checksum = data
-                distance = (h_data << 8) + l_data
-                if ((255 + h_data + l_data) & 0xFF) != checksum:
-                    print("Invalid result")
-                    return None
+                result = (h_data << 8) + l_data
+                if ((255 + h_data + l_data) & 0xFF) == checksum:
+                    distance = result
                 else:
-                    #print(f"Get Distance [mm]: {distance}")
-                    return distance
-    return None
+                    print("Invalid result")
+    
+    release_semaphore()  # Uvolnění semaforu po dokončení
+    return distance
 
 def get_distance():
     # average samples
