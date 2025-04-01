@@ -269,7 +269,7 @@ def draw_home_graph_hrs():
         UpdateLCD = False
 
 def draw_graph():
-    lcd.clear()
+    lcd.fill(0)
     lcd.text("Min:", 0, 0, 1)
     lcd.text("Max:", 0, 10, 1)    
     #print("distances", len(distances))
@@ -371,7 +371,7 @@ def draw_action_set_value(desc, value, unit = None):
     """
     global UpdateLCD
     if UpdateLCD:
-        lcd.clear()
+        lcd.fill(0)
         lcd.set_font(F16_FONT)
         lcd.set_text_wrap()
         if unit is not None:
@@ -487,7 +487,7 @@ def draw_menu():
     global UpdateLCD
     #print("draw_menu")
     """ Vykresli aktualni menu na LCD """
-    lcd.clear()
+    lcd.fill(0)
     lcd.set_font(F16_FONT)
     lcd.draw_text(current_menu, 0, 0)
 
