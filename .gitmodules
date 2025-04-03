@@ -1,0 +1,6 @@
+[submodule "kicad/lib"]
+	path = kicad/lib
+	url = https://github.com/recursivenomad/ki-lime-pi-pico.git
+[submodule "submodules/lcd12864"]
+	path = submodules/lcd12864
+	url = https://github.com/r2d2-arduino/micropython-lcd12864.git
