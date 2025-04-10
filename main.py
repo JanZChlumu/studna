@@ -162,7 +162,7 @@ pwmLCD = PWM(Pin(10))
 pwmLCD.freq(1000) # PWM 1kHz
 
 spi = SPI( 0, baudrate = 1_000_000, polarity = 1, phase = 1 )
-lcd = LCD12864_SPI( spi = spi, cs_pin = 20, rst_pin = 21, rotation = 1 )
+lcd = LCD12864_SPI( spi = spi, cs_pin = 20, rst_pin = 21, rotation = 0 )
 lcd.clear()
 UpdateLCD = False
 
@@ -329,7 +329,7 @@ def task1(timer):
             UpdateLCD = True    
 
 tim = Timer(-1)
-tim.init(period=2555, mode=Timer.PERIODIC, callback=task1)
+tim.init(period=1000, mode=Timer.PERIODIC, callback=task1)
 
 def updateGraphData(_):
     global graph_data
@@ -361,7 +361,8 @@ Historie pro grafy se ukládá jen v ram. LCD má rozlišení 128x64 pixelů, ta
 Pro 8h graf uložíme hodnotu každých 225 sec, pro 16h graf každých 450 sec a pro 32h graf každých 900 sec.
 """
 timStoreGraph = Timer(-1)
-timStoreGraph.init(period=1000*225, mode=Timer.PERIODIC, callback=updateGraphData)
+#timStoreGraph.init(period=1000*225, mode=Timer.PERIODIC, callback=updateGraphData)
+timStoreGraph.init(period=2500, mode=Timer.PERIODIC, callback=updateGraphData)
 
 def draw_action_set_value(desc, value, unit = None):
     """ Draw a value on the display
