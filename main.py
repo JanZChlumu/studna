@@ -162,7 +162,7 @@ pwmLCD = PWM(Pin(10))
 pwmLCD.freq(1000) # PWM 1kHz
 
 spi = SPI( 0, baudrate = 1_000_000, polarity = 1, phase = 1 )
-lcd = LCD12864_SPI( spi = spi, cs_pin = 15, rst_pin = 4, rotation = 1 )
+lcd = LCD12864_SPI( spi = spi, cs_pin = 20, rst_pin = 21, rotation = 1 )
 lcd.clear()
 UpdateLCD = False
 
