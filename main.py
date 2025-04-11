@@ -45,7 +45,7 @@ test_config_data = {"Min":             {"val": 20, "rotmax": 100, "rotstep" : 1,
                     "Posun reference": {"val": 8, "rotmax": 150, "rotstep" : 1, "unit": "mm", "rotmin" : -150},
                     "Graf historie":   {"val": 0, "rotmax": 2, "rotstep" : 1, "unit": "hodin"},
                     "LCD jas":         {"val": 2, "rotmax": 10, "rotstep" : 1},
-                    "LCD kontrast":    {"val": 2, "rotmax": 5, "rotstep" : 1},
+                    "LCD kontrast":    {"val": 2, "rotmax": 10, "rotstep" : 1},
                     "RESET Historie":  {"val": 0, "rotmax": 3, "rotstep" : 1},
                     "Průměruj vzorky":   {"val": 1, "rotmax": 7, "rotstep" : 1, "rotmin" : 1, "unit" : "vzorky"}} 
 
@@ -99,7 +99,11 @@ def load_cfg_to_shadow_ram(file_data):
             file_ram_shadow_data["Max"] = file_data["Max"]["val"]
             file_ram_shadow_data["GraphHrs"] = file_data["Graf historie"]["val"]
             file_ram_shadow_data["ReferenceShift"] = file_data["Posun reference"]["val"]
-            file_ram_shadow_data["AvgNo"] = file_data["Průměruj vzorky"]["val"]            
+            file_ram_shadow_data["AvgNo"] = file_data["Průměruj vzorky"]["val"]
+            file_ram_shadow_data["LCD jas"] = file_data["LCD jas"]["val"]
+            file_ram_shadow_data["LCD jas max"] = file_data["LCD jas"]["rotmax"]            
+            file_ram_shadow_data["LCD kontrast"] = file_data["LCD kontrast"]["val"]
+            file_ram_shadow_data["LCD kontrast max"] = file_data["LCD kontrast"]["rotmax"]
         except OSError:
             print("load_cfg_for_home_screens | no key found")
  
@@ -161,8 +165,11 @@ max_records = 128  # Počet měření za posledních 6 hodin -> uložit každé 
 pwmLCD = PWM(Pin(10))
 pwmLCD.freq(1000) # PWM 1kHz
 
+pwmContrast = PWM(Pin(11))
+pwmContrast.freq(1000) # PWM 1kHz
+
 spi = SPI( 0, baudrate = 1_000_000, polarity = 1, phase = 1 )
-lcd = LCD12864_SPI( spi = spi, cs_pin = 20, rst_pin = 21, rotation = 0 )
+lcd = LCD12864_SPI( spi = spi, cs_pin = 20, rst_pin = 21, rotation = 1 )  #TODO rotation na 0
 lcd.clear()
 UpdateLCD = False
 
@@ -187,7 +194,9 @@ def rotary_menu_reset_and_set_to_max(value):
 rotary_menu_reset_and_set_to_max(len(home_screens_list) - 1)
 
 def map_value(x, in_min, in_max, out_min, out_max):
-    return int((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)    
+    mapped_value = (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+    print(f"map_value -> {x} | {in_min} {in_max} | {out_min} {out_max} | -> {mapped_value}")
+    return int(mapped_value)    
 
 def measure_ultrasonic():
     if not acquire_semaphore():  
@@ -329,7 +338,7 @@ def task1(timer):
             UpdateLCD = True    
 
 tim = Timer(-1)
-tim.init(period=1000, mode=Timer.PERIODIC, callback=task1)
+tim.init(period=25*1000, mode=Timer.PERIODIC, callback=task1)
 
 def updateGraphData(_):
     global graph_data
@@ -361,8 +370,8 @@ Historie pro grafy se ukládá jen v ram. LCD má rozlišení 128x64 pixelů, ta
 Pro 8h graf uložíme hodnotu každých 225 sec, pro 16h graf každých 450 sec a pro 32h graf každých 900 sec.
 """
 timStoreGraph = Timer(-1)
-#timStoreGraph.init(period=1000*225, mode=Timer.PERIODIC, callback=updateGraphData)
-timStoreGraph.init(period=2500, mode=Timer.PERIODIC, callback=updateGraphData)
+timStoreGraph.init(period=1000*225, mode=Timer.PERIODIC, callback=updateGraphData)
+#timStoreGraph.init(period=2500, mode=Timer.PERIODIC, callback=updateGraphData)
 
 def draw_action_set_value(desc, value, unit = None):
     """ Draw a value on the display
@@ -397,7 +406,7 @@ def draw_action_graph_time_base(desc, value, unit = None):
         print("Invalid key in map_hours")
     draw_action_set_value(desc, map_hours[value], unit)
 
-def draw_action_bar(fill_percentage):
+def draw_action_bar(text_desc, fill_percentage):
     """ Draw a horizontal bar with adjustable fill
     Args:
     fill_percentage (int): Fill level from 0 to 100
@@ -405,10 +414,10 @@ def draw_action_bar(fill_percentage):
     global UpdateLCD
     if UpdateLCD:        
         print(fill_percentage)
-        #lcd.clear()
+        #lcd.fill(0)
         lcd.set_font(F24_FONT)
         lcd.set_text_wrap()        
-        lcd.draw_text("Nastav jas", 0, 0)
+        lcd.draw_text(text_desc, 0, 0)        
         bar_width = 100
         bar_height = 15
         x_start = 14
@@ -482,7 +491,9 @@ def draw_home_screen_percent():
         lcd.show()                        
         UpdateLCD = False
 
-pwmLCD.duty_u16(15000)
+
+pwmLCD.duty_u16(map_value(file_ram_shadow_data["LCD jas"], 0, file_ram_shadow_data["LCD jas max"], 0, 65535)) # 0-100%
+pwmContrast.duty_u16(map_value(file_ram_shadow_data["LCD kontrast"], 0, file_ram_shadow_data["LCD kontrast max"], 0, 65535)) # 0-100%
 
 def draw_menu():        
     global UpdateLCD
@@ -508,7 +519,7 @@ def navigate_menu():
         draw_menu()
 
 def entry_action(action):
-    global do_action, action_tmp_file__unit, action_tmp_file__rmax, RotaryPlausibleVal
+    global do_action, action_tmp_file__unit, action_tmp_file__rmax, RotaryPlausibleVal, UpdateLCD
     
     # načti z konfiguračního souboru
     cfg = load_file(FILE_CONFIG)
@@ -517,7 +528,8 @@ def entry_action(action):
         do_action = None
         rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1) #reset to menu
     else:
-        lcd.clear()        
+        lcd.clear()
+        UpdateLCD = True        
         try:
             if action in cfg:
                 action_tmp_file__rmax = cfg[action]["rotmax"]
@@ -650,10 +662,14 @@ while True:
                do_action == "Posun reference" or \
                do_action == "Průměruj vzorky":
                 draw_action_set_value(do_action, RotaryPlausibleVal, action_tmp_file__unit)    
-            elif do_action == "LCD jas" or \
-                 do_action == "LCD kontrast":
+            elif do_action == "LCD jas":                 
                 map_val = map_value(RotaryPlausibleVal, 0, action_tmp_file__rmax, 0, 100)
-                draw_action_bar(map_val)            
+                draw_action_bar(do_action, map_val)
+                pwmLCD.duty_u16(map_value(RotaryPlausibleVal, 0, action_tmp_file__rmax, 0, 65535))
+            elif do_action == "LCD kontrast":    
+                map_val = map_value(RotaryPlausibleVal, 0, action_tmp_file__rmax, 0, 100)
+                draw_action_bar(do_action, map_val)
+                pwmContrast.duty_u16(map_value(RotaryPlausibleVal, 0, action_tmp_file__rmax, 0, 65535))            
             elif do_action == "Hist. maxima":
                 draw_action_info_history_extrems()                            
             elif do_action == "Graf historie":
@@ -667,4 +683,4 @@ while True:
                 UpdateLCD = True
     else:
         print("Error actual screen") 
-    #time.sleep(0.1)
+    time.sleep(0.2)
