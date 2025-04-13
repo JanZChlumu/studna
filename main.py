@@ -34,18 +34,18 @@ FILE_HISTORY = "hist_data.json"
 
 # Definice viceurovnoveho menu
 menu = {
-    "Setting menu": ["Hladiny", "Zobrazení", "Info", "Zpět..."],
-    "Hladiny":      ["Min" , "Max", "Posun reference", "Zpět..."],
-    "Zobrazení":    ["Graf historie", "LCD jas", "LCD kontrast", "Zpět..."],
-    "Info":         ["Hist. maxima" , "RESET Historie" ,"Průměruj vzorky", "Zpět..."]
+    "Setting menu": ["Hladiny"      , "Zobrazení"       , "Info"            , "Zpět..."],
+    "Hladiny":      ["Min"          , "Max"             , "Posun reference" , "Zpět..."],
+    "Zobrazení":    ["Graf historie", "LCD jas"         , "LCD kontrast"    , "Zpět..."],
+    "Info":         ["Hist. maxima" , "RESET Historie"  , "Průměruj vzorky" , "Zpět..."]
 }
 # testovací konfigurace pro emulovanou EEPROM
 test_config_data = {"Min":             {"val": 20, "rotmax": 100, "rotstep" : 1, "unit": "cm"},
                     "Max":             {"val": 40, "rotmax": 200, "rotstep" : 1, "unit": "cm"},
-                    "Posun reference": {"val": 8, "rotmax": 150, "rotstep" : 1, "unit": "mm", "rotmin" : -150},
+                    "Posun reference": {"val": 0, "rotmax": 220, "rotstep" : 1, "unit": "mm", "rotmin" : -220},
                     "Graf historie":   {"val": 0, "rotmax": 2, "rotstep" : 1, "unit": "hodin"},
                     "LCD jas":         {"val": 2, "rotmax": 10, "rotstep" : 1},
-                    "LCD kontrast":    {"val": 2, "rotmax": 10, "rotstep" : 1},
+                    "LCD kontrast":    {"val": 4, "rotmax": 30, "rotstep" : 2},
                     "RESET Historie":  {"val": 0, "rotmax": 3, "rotstep" : 1},
                     "Průměruj vzorky":   {"val": 1, "rotmax": 7, "rotstep" : 1, "rotmin" : 1, "unit" : "vzorky"}} 
 
@@ -83,8 +83,8 @@ def load_file(file_name):
         print("File not found")
         return None  # Soubor neexistuje
 
-#print("!!!!!!! test confguration !!!!!!!!!")
-#save_file(FILE_CONFIG, test_config_data)    #TOdo remove later
+print("!!!!!!! test confguration !!!!!!!!!")
+save_file(FILE_CONFIG, test_config_data)    #TOdo remove later
 
 file_ram_shadow_data = {}
 
@@ -167,6 +167,8 @@ pwmLCD.freq(1000) # PWM 1kHz
 
 pwmContrast = PWM(Pin(11))
 pwmContrast.freq(1000) # PWM 1kHz
+MIN_PWM_CONTRAST = 0
+MAX_PWM_CONTRAST = 65535
 
 spi = SPI( 0, baudrate = 1_000_000, polarity = 1, phase = 1 )
 lcd = LCD12864_SPI( spi = spi, cs_pin = 20, rst_pin = 21, rotation = 1 )  #TODO rotation na 0
@@ -229,7 +231,7 @@ def get_distance():
         for i in range(file_ram_shadow_data["AvgNo"]):
             dist_mm = measure_ultrasonic()
             if dist_mm is not None:
-                dist_mm += file_ram_shadow_data["ReferenceShift"]
+                #dist_mm = file_ram_shadow_data["ReferenceShift"] - dist_mm
                 distances.append(dist_mm)
         if len(distances) > 0:
             avg = sum(distances) / len(distances)
@@ -327,7 +329,7 @@ def task1(timer):
     #TODO always check limit - save water level
     dist_mm = get_distance()
     if dist_mm is not None:            
-        dist_mm += file_ram_shadow_data["ReferenceShift"]
+        dist_mm = file_ram_shadow_data["ReferenceShift"] - dist_mm
         update_history_data(dist_mm) #update history data
 
         if ActualHomeScreen in home_screens_list:
@@ -338,7 +340,7 @@ def task1(timer):
             UpdateLCD = True    
 
 tim = Timer(-1)
-tim.init(period=25*1000, mode=Timer.PERIODIC, callback=task1)
+tim.init(period=2*1000, mode=Timer.PERIODIC, callback=task1)
 
 def updateGraphData(_):
     global graph_data
@@ -493,7 +495,7 @@ def draw_home_screen_percent():
 
 
 pwmLCD.duty_u16(map_value(file_ram_shadow_data["LCD jas"], 0, file_ram_shadow_data["LCD jas max"], 0, 65535)) # 0-100%
-pwmContrast.duty_u16(map_value(file_ram_shadow_data["LCD kontrast"], 0, file_ram_shadow_data["LCD kontrast max"], 0, 65535)) # 0-100%
+pwmContrast.duty_u16(map_value(file_ram_shadow_data["LCD kontrast"], 0, file_ram_shadow_data["LCD kontrast max"], MIN_PWM_CONTRAST, MAX_PWM_CONTRAST)) # 0-100%
 
 def draw_menu():        
     global UpdateLCD
@@ -669,7 +671,7 @@ while True:
             elif do_action == "LCD kontrast":    
                 map_val = map_value(RotaryPlausibleVal, 0, action_tmp_file__rmax, 0, 100)
                 draw_action_bar(do_action, map_val)
-                pwmContrast.duty_u16(map_value(RotaryPlausibleVal, 0, action_tmp_file__rmax, 0, 65535))            
+                pwmContrast.duty_u16(map_value(RotaryPlausibleVal, 0, action_tmp_file__rmax, MIN_PWM_CONTRAST, MAX_PWM_CONTRAST))            
             elif do_action == "Hist. maxima":
                 draw_action_info_history_extrems()                            
             elif do_action == "Graf historie":
