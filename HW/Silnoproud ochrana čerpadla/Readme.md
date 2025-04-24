@@ -1,0 +1,1 @@
+Nakresleno v toolu https://qelectrotech.org/
