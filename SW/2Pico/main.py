@@ -170,7 +170,7 @@ MIN_PWM_CONTRAST = 0
 MAX_PWM_CONTRAST = 65535
 
 spi = SPI( 0, baudrate = 1_000_000, polarity = 1, phase = 1 )
-lcd = LCD12864_SPI( spi = spi, cs_pin = 20, rst_pin = 21, rotation = 1 )  #TODO rotation na 0
+lcd = LCD12864_SPI( spi = spi, cs_pin = 20, rst_pin = 21, rotation = 0 )
 lcd.clear()
 UpdateLCD = False
 
