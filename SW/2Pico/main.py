@@ -82,8 +82,8 @@ def load_file(file_name):
         print("File not found")
         return None  # Soubor neexistuje
 
-print("!!!!!!! test confguration !!!!!!!!!")
-save_file(FILE_CONFIG, test_config_data)    #TOdo remove later
+#print("!!!!!!! test confguration !!!!!!!!!")
+#save_file(FILE_CONFIG, test_config_data)    #TOdo remove later
 
 file_ram_shadow_data = {}
 
@@ -175,7 +175,7 @@ lcd.clear()
 UpdateLCD = False
 
 # Inicializace rotačního enkodéru
-rot = RotaryIRQ(pin_num_clk=6, pin_num_dt=7, min_val=0, max_val=5, reverse=False, range_mode=RotaryIRQ.RANGE_WRAP, pull_up=True)
+rot = RotaryIRQ(pin_num_clk=6, pin_num_dt=7, min_val=0, max_val=5, reverse=True, range_mode=RotaryIRQ.RANGE_WRAP, pull_up=True)
 
 # Inicializace tlačítka potvrzení
 button = Pin(14, Pin.IN, Pin.PULL_UP)
@@ -218,14 +218,16 @@ def measure_ultrasonic():
                     distance = result
                 else:
                     print("Invalid result")
-    
+                    led.toggle()
+                    led.toggle()
+                    led.toggle()
+    print(f"measure_ultrasonic {distance}")    
     release_semaphore()  # Uvolnění semaforu po dokončení
     return distance
 
-def get_distance():
+def get_distance():    
     # average samples
-    if file_ram_shadow_data["AvgNo"] > 1:
-        #print("measure_ultasonic")
+    if file_ram_shadow_data.get("AvgNo", 1) > 1:                
         distances = []
         for i in range(file_ram_shadow_data["AvgNo"]):
             dist_mm = measure_ultrasonic()
@@ -236,14 +238,16 @@ def get_distance():
                 distances.append(dist_mm)
         if len(distances) > 0:
             avg = sum(distances) / len(distances)
-            print(f"measure_ultasonic | dist_mm {distances} | avg {avg}")
+            print(f"get_distance_AVG | dist_mm {distances} | avg {avg}")
             return avg
     else:
         # no average samples
         return measure_ultrasonic()
+       
+   
 
 def draw_home_graph_hrs():
-    global UpdateLCD
+    global UpdateLCD, home_screens_show_data
     if UpdateLCD:
         lcd.fill(0)    
         map_hours = {0: "8h", 1: "16h", 2: "32h"}
@@ -277,9 +281,9 @@ def draw_home_graph_hrs():
                 lcd.text( " " + map_hours[_hr] + " graf ", 25, 30, 1)
         else:
             print("Invalid key in map_hours")                    
-        if home_screens_show_data["error"] is not None:
+        if home_screens_show_data.get("error", "NoError") != "NoError":
             lcd.set_font(F12_FONT)
-            lcd.draw_text(home_screens_show_data["error"], 30, 0, 1, center_x=True, clear_background=True)
+            lcd.draw_text(str(home_screens_show_data["error"]), 30, 0, center_x=True, clear_background=True)
             home_screens_show_data["error"] = None
         lcd.show()
         UpdateLCD = False
@@ -328,20 +332,21 @@ def haptic(timer):
 hapticTimer = Timer(-1)
 hapticTimer.init(period=19, mode=Timer.PERIODIC, callback=haptic) 
 
+#update homescreens
 def task1(timer):    
     global UpdateLCD, home_screens_show_data
-    led.toggle()
+    #led.toggle()
     #TODO always check limit - save water level
     dist_mm = get_distance()
     if dist_mm is not None:            
-        dist_mm = file_ram_shadow_data["ReferenceShift"] - dist_mm
+        #dist_mm = file_ram_shadow_data["ReferenceShift"] - dist_mm
         update_history_data(dist_mm) #update history data
 
         if ActualHomeScreen in home_screens_list:
             _dist_cm = round(float(dist_mm / 10), 2)
             _percent = int((((dist_mm/10) - file_ram_shadow_data["Min"]) * 100)/file_ram_shadow_data["Max"])
             home_screens_show_data = {"dist_cm": _dist_cm, "percent": _percent}
-            print(f"task1 | dist_cm {_dist_cm} | percent {_percent}")
+            print(f"task1 | dist_cm {_dist_cm} | percent {_percent} | actual_home_screen {ActualHomeScreen}")
             UpdateLCD = True    
 
 tim = Timer(-1)
@@ -477,33 +482,35 @@ def draw_screens(screen_id):
         print(f"Home {screen_id}")
 
 def draw_home_screen_cm():
-    global UpdateLCD
+    global UpdateLCD, home_screens_show_data
     if UpdateLCD:
         lcd.fill(0)        
         lcd.set_font(F16_FONT)        
         lcd.draw_text("Výška hladiny", 0, 0, center_x=True)
         lcd.set_font(F36_FONT)        
-        lcd.draw_text(str(home_screens_show_data["dist_cm"]) + "cm", 0, 15, center_x=True)
-        if home_screens_show_data["error"] is not None:
+        lcd.draw_text(str(home_screens_show_data["dist_cm"]) + "cm", 0, 15, center_x=True)                
+        if home_screens_show_data.get("error", "NoError") != "NoError":
+            print(f"error {home_screens_show_data["error"]}")
             lcd.set_font(F12_FONT)
-            lcd.draw_text(home_screens_show_data["error"], 30, 0, 1, center_x=True, clear_background=True)
+            lcd.draw_text(str(home_screens_show_data["error"]), 30, 0, center_x=True, clear_background=True)
             home_screens_show_data["error"] = None
         lcd.show()                        
         UpdateLCD = False
+        
 
 def draw_home_screen_percent():
-    global UpdateLCD
+    global UpdateLCD, home_screens_show_data
     if UpdateLCD:
         lcd.fill(0)        
         lcd.set_font(F16_FONT)        
         lcd.draw_text("V zásobě %", 5, -2, center_x=True)
         lcd.set_font(F80_FONT)        
-        lcd.draw_text(str(home_screens_show_data["percent"]), 0, -2, center_x=True)
-        lcd.show()
-        if home_screens_show_data["error"] is not None:
+        lcd.draw_text(str(home_screens_show_data["percent"]), 0, -2, center_x=True)        
+        if home_screens_show_data.get("error", "NoError") != "NoError":
             lcd.set_font(F16_FONT)
-            lcd.draw_text(home_screens_show_data["error"], 30, 0, 1, center_x=True, clear_background=True)
+            lcd.draw_text(str(home_screens_show_data["error"]), 30, 0, center_x=True, clear_background=True)
             home_screens_show_data["error"] = None
+        lcd.show()
         UpdateLCD = False
 
 
