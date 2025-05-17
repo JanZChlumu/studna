@@ -217,10 +217,7 @@ def measure_ultrasonic():
                 if ((255 + h_data + l_data) & 0xFF) == checksum:
                     distance = result
                 else:
-                    print("Invalid result")
-                    led.toggle()
-                    led.toggle()
-                    led.toggle()
+                    print("Invalid result")                    
     print(f"measure_ultrasonic {distance}")    
     release_semaphore()  # Uvolnění semaforu po dokončení
     return distance
@@ -235,7 +232,7 @@ def get_distance():
                 #dist_mm = file_ram_shadow_data["ReferenceShift"] - dist_mm
                 if dist_mm < 0:
                     home_screens_show_data["error"] = "Uprav ref. hladinu"
-                distances.append(dist_mm)
+                distances.append(dist_mm)                        
         if len(distances) > 0:
             avg = sum(distances) / len(distances)
             print(f"get_distance_AVG | dist_mm {distances} | avg {avg}")
@@ -335,7 +332,7 @@ hapticTimer.init(period=19, mode=Timer.PERIODIC, callback=haptic)
 #update homescreens
 def task1(timer):    
     global UpdateLCD, home_screens_show_data
-    #led.toggle()
+    led.toggle()
     #TODO always check limit - save water level
     dist_mm = get_distance()
     if dist_mm is not None:            
@@ -343,11 +340,14 @@ def task1(timer):
         update_history_data(dist_mm) #update history data
 
         if ActualHomeScreen in home_screens_list:
-            _dist_cm = round(float(dist_mm / 10), 2)
-            _percent = int((((dist_mm/10) - file_ram_shadow_data["Min"]) * 100)/file_ram_shadow_data["Max"])
-            home_screens_show_data = {"dist_cm": _dist_cm, "percent": _percent}
-            print(f"task1 | dist_cm {_dist_cm} | percent {_percent} | actual_home_screen {ActualHomeScreen}")
-            UpdateLCD = True    
+            _dist_cm = round(float(dist_mm / 10), 1)
+            _percent = int((((dist_mm/10) - file_ram_shadow_data["Min"]) * 100)/file_ram_shadow_data["Max"])            
+            print(f"task1 | dist_cm {_dist_cm} | percent {_percent} | actual_home_screen {ActualHomeScreen}")            
+    else:
+        _dist_cm = "?"
+        _percent = "?"        
+    home_screens_show_data = {"dist_cm": _dist_cm, "percent": _percent}
+    UpdateLCD = True    
 
 tim = Timer(-1)
 tim.init(period=2*1000, mode=Timer.PERIODIC, callback=task1)

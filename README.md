@@ -1,7 +1,7 @@
 # Studna
 Projekt se skládá ze 2 nezávislých částí
 ## Ochrana domácí vodárny
-Do studny je umístěn hladinový spínač, který vybaví při kriticky nízké hladině. Odpojí 3 fázovou domácí vodárnu, aby se systém nezavzdušnil a čerpadlo neshořelo. [Schema v rozvaděči](./HW/Silnoproud ochrana čerpadla/darling ochrana.pdf)
+Do studny je umístěn hladinový spínač, který vybaví při kriticky nízké hladině. Odpojí 3 fázovou domácí vodárnu, aby se systém nezavzdušnil a čerpadlo neshořelo. [Schema v rozvaděči](./HW/Silnoproud_ochrana_cerpadla/darling_ochrana.pdf)
 
 ## Měření výšky hladiny
 Motivace: Do studny byl při rekonstrukci zaveden UTP kabel.
