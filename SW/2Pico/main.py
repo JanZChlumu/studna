@@ -34,14 +34,14 @@ FILE_HISTORY = "hist_data.json"
 # Definice viceurovnoveho menu
 menu = {
     "Setting menu": ["Hladiny"      , "Zobrazení"       , "Info"            , "Zpět..."],
-    "Hladiny":      ["Min"          , "Max"             , "Posun reference" , "Zpět..."],
+    "Hladiny":      ["Min"          , "Max"             , "H reference" , "Zpět..."],
     "Zobrazení":    ["Graf historie", "LCD jas"         , "LCD kontrast"    , "Zpět..."],
     "Info":         ["Hist. maxima" , "RESET Historie"  , "Průměruj vzorky" , "Zpět..."]
 }
 # testovací konfigurace pro emulovanou EEPROM
-test_config_data = {"Min":             {"val": 20, "rotmax": 100, "rotstep" : 1, "unit": "cm"},
+test_config_data = {"Min":             {"val": 20, "rotmax": 200, "rotstep" : 1, "unit": "cm"},
                     "Max":             {"val": 40, "rotmax": 200, "rotstep" : 1, "unit": "cm"},
-                    "Posun reference": {"val": 0, "rotmax": 220, "rotstep" : 1, "unit": "mm", "rotmin" : -220},
+                    "H reference": {"val": 0, "rotmax": 250, "rotstep" : 1, "unit": "cm", "rotmin" : 0},
                     "Graf historie":   {"val": 0, "rotmax": 2, "rotstep" : 1, "unit": "hodin"},
                     "LCD jas":         {"val": 2, "rotmax": 10, "rotstep" : 1},
                     "LCD kontrast":    {"val": 4, "rotmax": 30, "rotstep" : 2},
@@ -54,7 +54,7 @@ action_tmp_file__rmax = None  # dočasná hodnota z konfiguračního souboru, vy
 action_tmp_file__unit = None  # dočasná hodnota z konfiguračního souboru, vyžadují některé akce
 
 graph_data = {"8h": [], "16h": [], "32h": [], "counter": 0}
-home_screens_show_data = {"dist_cm": -1, "percent": -1, "error": None}
+home_screens_show_data = {"dist_cm": -1, "percent": -1, "error": 0}
 
 current_menu = "Setting menu"
 selected_action = 0
@@ -97,7 +97,7 @@ def load_cfg_to_shadow_ram(file_data):
             file_ram_shadow_data["Min"] = file_data["Min"]["val"]
             file_ram_shadow_data["Max"] = file_data["Max"]["val"]
             file_ram_shadow_data["GraphHrs"] = file_data["Graf historie"]["val"]
-            file_ram_shadow_data["ReferenceShift"] = file_data["Posun reference"]["val"]
+            file_ram_shadow_data["ReferenceShift"] = file_data["H reference"]["val"]
             file_ram_shadow_data["AvgNo"] = file_data["Průměruj vzorky"]["val"]
             file_ram_shadow_data["LCD jas"] = file_data["LCD jas"]["val"]
             file_ram_shadow_data["LCD jas max"] = file_data["LCD jas"]["rotmax"]            
@@ -223,28 +223,42 @@ def measure_ultrasonic():
     return distance
 
 def get_distance():    
-    # average samples
+    global home_screens_show_data, file_ram_shadow_data    
+    _refShift_mm = file_ram_shadow_data["ReferenceShift"] * 10 #convert mm to cm    
+    # average samples    
     if file_ram_shadow_data.get("AvgNo", 1) > 1:                
         distances = []
         for i in range(file_ram_shadow_data["AvgNo"]):
             dist_mm = measure_ultrasonic()
             if dist_mm is not None:
-                #dist_mm = file_ram_shadow_data["ReferenceShift"] - dist_mm
-                if dist_mm < 0:
-                    home_screens_show_data["error"] = "Uprav ref. hladinu"
-                distances.append(dist_mm)                        
+                dist_mm = _refShift_mm - dist_mm
+                if dist_mm < 0:                                        
+                    home_screens_show_data["error"] = -1
+                else:                    
+                    distances.append(dist_mm)                        
         if len(distances) > 0:
             avg = sum(distances) / len(distances)
             print(f"get_distance_AVG | dist_mm {distances} | avg {avg}")
             return avg
     else:
-        # no average samples
-        return measure_ultrasonic()
-       
-   
+        # no average samples        
+        dist_mm = measure_ultrasonic()
+        if dist_mm is not None:
+            dist_mm = _refShift_mm - dist_mm
+            if dist_mm < 0:                
+                home_screens_show_data["error"] = -1                
+            print(f"get_distance | dist_mm {dist_mm}")
+    return dist_mm
 
+def draw_error_msg():
+    global home_screens_show_data
+    if home_screens_show_data["error"] != 0:        
+        lcd.set_font(F12_FONT)
+        lcd.draw_text("Uprav ref. hladinu", 0, 50, center_x=True, clear_background=True) # x axis is centered
+        home_screens_show_data["error"] = 0
+    
 def draw_home_graph_hrs():
-    global UpdateLCD, home_screens_show_data
+    global UpdateLCD
     if UpdateLCD:
         lcd.fill(0)    
         map_hours = {0: "8h", 1: "16h", 2: "32h"}
@@ -278,10 +292,7 @@ def draw_home_graph_hrs():
                 lcd.text( " " + map_hours[_hr] + " graf ", 25, 30, 1)
         else:
             print("Invalid key in map_hours")                    
-        if home_screens_show_data.get("error", "NoError") != "NoError":
-            lcd.set_font(F12_FONT)
-            lcd.draw_text(str(home_screens_show_data["error"]), 30, 0, center_x=True, clear_background=True)
-            home_screens_show_data["error"] = None
+        draw_error_msg()
         lcd.show()
         UpdateLCD = False
 
@@ -329,16 +340,15 @@ def haptic(timer):
 hapticTimer = Timer(-1)
 hapticTimer.init(period=19, mode=Timer.PERIODIC, callback=haptic) 
 
-#update homescreens
+#cyclicaly update data for all homescreens
 def task1(timer):    
-    global UpdateLCD, home_screens_show_data
+    global UpdateLCD, home_screens_show_data    
+    _dist_cm = ""
+    _percent = ""
     led.toggle()
-    #TODO always check limit - save water level
     dist_mm = get_distance()
-    if dist_mm is not None:            
-        #dist_mm = file_ram_shadow_data["ReferenceShift"] - dist_mm
-        update_history_data(dist_mm) #update history data
-
+    if dist_mm is not None:                    
+        update_history_data(dist_mm) #update history data        
         if ActualHomeScreen in home_screens_list:
             _dist_cm = round(float(dist_mm / 10), 1)
             _percent = int((((dist_mm/10) - file_ram_shadow_data["Min"]) * 100)/file_ram_shadow_data["Max"])            
@@ -346,17 +356,18 @@ def task1(timer):
     else:
         _dist_cm = "?"
         _percent = "?"        
-    home_screens_show_data = {"dist_cm": _dist_cm, "percent": _percent}
+    home_screens_show_data.update({"dist_cm": _dist_cm, "percent": _percent})
     UpdateLCD = True    
 
 tim = Timer(-1)
 tim.init(period=2*1000, mode=Timer.PERIODIC, callback=task1)
 
+# called by Timer (timStoreGraph) in basic period for 8hours graph
 def updateGraphData(_):
     global graph_data
     print("updateGraphData")
-    _dist = get_distance()
     _arrray_max = 128
+    _dist = get_distance()    
     if _dist is not None:
         #8h store
         graph_data["8h"].append(_dist)
@@ -375,7 +386,7 @@ def updateGraphData(_):
             if len(graph_data["32h"]) > _arrray_max:    
                 graph_data["32h"].pop(0)
             print("updateGraphData | data 32h", graph_data["32h"])
-    graph_data["counter"] += 1
+    graph_data["counter"] += 1 # for storage modulo
 
 """
 Historie pro grafy se ukládá jen v ram. LCD má rozlišení 128x64 pixelů, takže max 128 bodů uložíme pro každý graf.
@@ -383,7 +394,7 @@ Pro 8h graf uložíme hodnotu každých 225 sec, pro 16h graf každých 450 sec 
 """
 timStoreGraph = Timer(-1)
 timStoreGraph.init(period=1000*225, mode=Timer.PERIODIC, callback=updateGraphData)
-#timStoreGraph.init(period=2500, mode=Timer.PERIODIC, callback=updateGraphData)
+#timStoreGraph.init(period=2500, mode=Timer.PERIODIC, callback=updateGraphData) # testing short time
 
 def draw_action_set_value(desc, value, unit = None):
     """ Draw a value on the display
@@ -488,12 +499,8 @@ def draw_home_screen_cm():
         lcd.set_font(F16_FONT)        
         lcd.draw_text("Výška hladiny", 0, 0, center_x=True)
         lcd.set_font(F36_FONT)        
-        lcd.draw_text(str(home_screens_show_data["dist_cm"]) + "cm", 0, 15, center_x=True)                
-        if home_screens_show_data.get("error", "NoError") != "NoError":
-            print(f"error {home_screens_show_data["error"]}")
-            lcd.set_font(F12_FONT)
-            lcd.draw_text(str(home_screens_show_data["error"]), 30, 0, center_x=True, clear_background=True)
-            home_screens_show_data["error"] = None
+        lcd.draw_text(str(home_screens_show_data["dist_cm"]) + "cm", 0, 15, center_x=True)                                
+        draw_error_msg()
         lcd.show()                        
         UpdateLCD = False
         
@@ -506,10 +513,7 @@ def draw_home_screen_percent():
         lcd.draw_text("V zásobě %", 5, -2, center_x=True)
         lcd.set_font(F80_FONT)        
         lcd.draw_text(str(home_screens_show_data["percent"]), 0, -2, center_x=True)        
-        if home_screens_show_data.get("error", "NoError") != "NoError":
-            lcd.set_font(F16_FONT)
-            lcd.draw_text(str(home_screens_show_data["error"]), 30, 0, center_x=True, clear_background=True)
-            home_screens_show_data["error"] = None
+        draw_error_msg()
         lcd.show()
         UpdateLCD = False
 
@@ -681,7 +685,7 @@ while True:
             #ALL actions HERE
             if do_action == "Max" or \
                do_action == "Min" or \
-               do_action == "Posun reference" or \
+               do_action == "H reference" or \
                do_action == "Průměruj vzorky":
                 draw_action_set_value(do_action, RotaryPlausibleVal, action_tmp_file__unit)    
             elif do_action == "LCD jas":                 
