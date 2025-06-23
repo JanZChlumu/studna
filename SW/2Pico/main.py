@@ -33,7 +33,7 @@ FILE_HISTORY = "hist_data.json"
 
 # Definice viceurovnoveho menu
 menu = {
-    "Setting menu": ["Hladiny"      , "Zobrazení"       , "Info"            , "Zpět..."],
+    "Nastavení":    ["Hladiny"      , "Zobrazení"       , "Info"            , "Zpět..."],
     "Hladiny":      ["Min"          , "Max"             , "H reference" , "Zpět..."],
     "Zobrazení":    ["Graf historie", "LCD jas"         , "LCD kontrast"    , "Zpět..."],
     "Info":         ["Hist. maxima" , "RESET Historie"  , "Průměruj vzorky" , "Zpět..."]
@@ -43,7 +43,7 @@ test_config_data = {"Min":             {"val": 20, "rotmax": 200, "rotstep" : 1,
                     "Max":             {"val": 40, "rotmax": 200, "rotstep" : 1, "unit": "cm"},
                     "H reference": {"val": 0, "rotmax": 250, "rotstep" : 1, "unit": "cm", "rotmin" : 0},
                     "Graf historie":   {"val": 0, "rotmax": 2, "rotstep" : 1, "unit": "hodin"},
-                    "LCD jas":         {"val": 2, "rotmax": 10, "rotstep" : 1},
+                    "LCD jas":         {"val": 2, "rotmax": 30, "rotstep" : 1},
                     "LCD kontrast":    {"val": 4, "rotmax": 30, "rotstep" : 2},
                     "RESET Historie":  {"val": 0, "rotmax": 3, "rotstep" : 1},
                     "Průměruj vzorky":   {"val": 1, "rotmax": 7, "rotstep" : 1, "rotmin" : 1, "unit" : "vzorky"}} 
@@ -56,7 +56,7 @@ action_tmp_file__unit = None  # dočasná hodnota z konfiguračního souboru, vy
 graph_data = {"8h": [], "16h": [], "32h": [], "counter": 0}
 home_screens_show_data = {"dist_cm": -1, "percent": -1, "error": 0}
 
-current_menu = "Setting menu"
+current_menu = "Nastavení"
 selected_action = 0
 
 # Seznam položek menu
@@ -624,9 +624,9 @@ def check_button(_):
         UpdateLCD = True
         print(f"-> BTN ActualHomeScreen {ActualHomeScreen} | cur_menu {current_menu} | sel_action {selected_action} ")
         if ActualHomeScreen is not None:
-            # entry into setting menu            
+            # entry into Nastavení            
             ActualHomeScreen = None
-            current_menu = "Setting menu"
+            current_menu = "Nastavení"
             selected_action = 0
             rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1)
             
@@ -635,12 +635,12 @@ def check_button(_):
                 print("BTN  Menu selection")
                 selected_text = menu[current_menu][selected_action]       
                 if selected_text == "Zpět...":
-                    if current_menu == "Setting menu":  #leave menu
+                    if current_menu == "Nastavení":  #leave menu
                         print("naaaaaaaaaaaavrat")
                         ActualHomeScreen = "Home_%"
                         rotary_menu_reset_and_set_to_max(len(home_screens_list) - 1)
                     else:
-                        current_menu = "Setting menu"
+                        current_menu = "Nastavení"
                         rotary_menu_reset_and_set_to_max(len(menu[current_menu]) - 1)
                         selected_action = 0
                         
