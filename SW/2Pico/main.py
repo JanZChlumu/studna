@@ -54,14 +54,14 @@ action_tmp_file__rmax = None  # dočasná hodnota z konfiguračního souboru, vy
 action_tmp_file__unit = None  # dočasná hodnota z konfiguračního souboru, vyžadují některé akce
 
 graph_data = {"8h": [], "16h": [], "32h": [], "counter": 0}
-home_screens_show_data = {"dist_cm": -1, "percent": -1, "error": 0}
+home_screens_show_data = {"dist_cm": -1, "percent": -1, "liters": -1 ,"error": 0}
 
 current_menu = "Nastavení"
 selected_action = 0
 
 # Seznam položek menu
-home_screens_list = ["Home_%", "Home_cm", "Home_graf"]
-ActualHomeScreen = home_screens_list[0] 
+home_screens_list = ["Home_%", "Home_cm", "Home_graf", "Home_liters"]
+ActualHomeScreen = home_screens_list[3] 
 
 hist_data_shadow = {"min": 0, "max": 0}
 
@@ -296,34 +296,6 @@ def draw_home_graph_hrs():
         lcd.show()
         UpdateLCD = False
 
-def draw_graph():
-    lcd.fill(0)
-    lcd.text("Min:", 0, 0, 1)
-    lcd.text("Max:", 0, 10, 1)    
-    #print("distances", len(distances))
-    
-    if len(distances) > 0:
-        min_distance = min(distances)
-        max_distance = max(distances)
-        range_distance = max_distance - min_distance
-        
-        lcd.text(str(min_distance), 35, 0, 1)
-        lcd.text(str(max_distance), 35, 10, 1)
-        
-        # Prevent division by zero if all distances are the same
-        if range_distance == 0:
-            scale = 63
-        else:
-            scale = 63 / range_distance
-
-        for i in range(1, len(distances)):
-            x1 = int((i - 1) * 128 / max_records)
-            y1 = 63 - int((distances[i - 1] - min_distance) * scale)
-            x2 = int(i * 128 / max_records)
-            y2 = 63 - int((distances[i] - min_distance) * scale)
-            lcd.line(x1, y1, x2, y2, 1)    
-    lcd.show()
-
 """
 HAPTIC Timer call cyclic
 """
@@ -345,22 +317,26 @@ def task1(timer):
     global UpdateLCD, home_screens_show_data    
     _dist_cm = ""
     _percent = ""
+    _liters  = ""
+    _hole_diameter_cm = 100 #prumer studny v cm
     led.toggle()
     dist_mm = get_distance()
     if dist_mm is not None:                    
         update_history_data(dist_mm) #update history data        
         if ActualHomeScreen in home_screens_list:
             _dist_cm = round(float(dist_mm / 10), 1)
-            _percent = int((((dist_mm/10) - file_ram_shadow_data["Min"]) * 100)/file_ram_shadow_data["Max"])            
-            print(f"task1 | dist_cm {_dist_cm} | percent {_percent} | actual_home_screen {ActualHomeScreen}")            
+            _percent = int((((dist_mm/10) - file_ram_shadow_data["Min"]) * 100)/file_ram_shadow_data["Max"])
+            _liters = int((((3.14*_hole_diameter_cm*_hole_diameter_cm)/4)*(_dist_cm - file_ram_shadow_data["Min"]))/1000)
+            print(f"task1 | dist_cm {_dist_cm} | percent {_percent} | liters {_liters} | actual_home_screen {ActualHomeScreen}")            
     else:
         _dist_cm = "?"
-        _percent = "?"        
-    home_screens_show_data.update({"dist_cm": _dist_cm, "percent": _percent})
+        _percent = "?"
+        _liters  = "?"
+    home_screens_show_data.update({"dist_cm": _dist_cm, "percent": _percent, "liters": _liters})
     UpdateLCD = True    
 
 tim = Timer(-1)
-tim.init(period=2*1000, mode=Timer.PERIODIC, callback=task1)
+tim.init(period=5*1000, mode=Timer.PERIODIC, callback=task1)
 
 # called by Timer (timStoreGraph) in basic period for 8hours graph
 def updateGraphData(_):
@@ -480,18 +456,6 @@ def draw_action_info_history_extrems():
         UpdateLCD = False
         print("draw_history_maximums")
 
-def draw_screens(screen_id):    
-    global UpdateLCD
-    if UpdateLCD:          
-        lcd.fill(0)        
-        lcd.set_font(F80_FONT)
-        #lcd.set_text_wrap()
-        lcd.text(home_screens_list[screen_id], 0, 0)
-        lcd.draw_text(str(screen_id) + "3%", 0, -10)
-        lcd.show()                        
-        UpdateLCD = False
-        print(f"Home {screen_id}")
-
 def draw_home_screen_cm():
     global UpdateLCD, home_screens_show_data
     if UpdateLCD:
@@ -503,7 +467,19 @@ def draw_home_screen_cm():
         draw_error_msg()
         lcd.show()                        
         UpdateLCD = False
-        
+
+def draw_home_screen_liters():
+    global UpdateLCD, home_screens_show_data
+    if UpdateLCD:
+        lcd.fill(0)        
+        lcd.set_font(F16_FONT)        
+        lcd.draw_text("Litrů v zásobě", 5, -2, center_x=True)
+        lcd.set_font(F80_FONT)        
+        lcd.draw_text(str(home_screens_show_data["liters"]), 0, -2, center_x=True)        
+        draw_error_msg()
+        lcd.show()
+        UpdateLCD = False
+
 
 def draw_home_screen_percent():
     global UpdateLCD, home_screens_show_data
@@ -670,14 +646,13 @@ button.irq(trigger=Pin.IRQ_FALLING, handler=button_isr)
 while True:    
     #print(f"while act screen {ActualScreen}")
     if ActualHomeScreen == "Home_%":        
-        draw_home_screen_percent()
-        #draw_screens(home_screens_list.index(ActualHomeScreen))
+        draw_home_screen_percent()        
     elif ActualHomeScreen == "Home_cm":        
-        draw_home_screen_cm()
-        #draw_screens(home_screens_list.index(ActualHomeScreen))
+        draw_home_screen_cm()        
     elif ActualHomeScreen == "Home_graf":
         draw_home_graph_hrs()
-        #draw_screens(home_screens_list.index(ActualHomeScreen))        
+    elif ActualHomeScreen == "Home_liters":
+        draw_home_screen_liters()            
     elif ActualHomeScreen is None:        
         if do_action is None:
             navigate_menu()
@@ -709,4 +684,4 @@ while True:
                 UpdateLCD = True
     else:
         print("Error actual screen") 
-    time.sleep(0.2)
+    #time.sleep(0.2)
