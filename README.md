@@ -4,7 +4,7 @@
 > - Měření výšky hladiny
 
 ## Ochrana domácí vodárny
-Do studny je umístěn hladinový spínač, který sepne při kriticky nízké hladině. Tím se odpojí (3 fázová) domácí vodárna, aby se systém nezavzdušnil a čerpadlo neshořelo. [Schema v rozvaděči](./HW/Silnoproud_ochrana_cerpadla/darling_ochrana.pdf)
+Do studny je umístěn [hladinový spínač](./img/Instalace_2.png), který sepne při kriticky nízké hladině. Tím se odpojí (3 fázová) domácí vodárna, aby se systém nezavzdušnil a čerpadlo neshořelo. [Schema v rozvaděči](./HW/Silnoproud_ochrana_cerpadla/darling_ochrana.pdf)
 
 ## Měření výšky hladiny
 Motivace:
@@ -19,9 +19,6 @@ Pro obě řešení zůstane stejná komunikace mezi senzorem a řídící jednot
 
 ### Zobrazovací a řídicí jednotka 
 Základní bloky:
-- modul 485
-- Raspberry Pico
-- LCD 128x64
 
 ![BlokoveSchema](./doc/Studna_bokove_schema.png)
 
@@ -51,7 +48,8 @@ Např. pokud vnitřní časovač v modulu meří s přesností 100µs, pak bude 
 $$
 0{,}0343 \text{cm} \cdot 100 \mu \cdot \frac{1}{2} \approx 1{,}7 \text{cm}
 $$
-Myslím, že modul JSN-SR04T vyhodnocuje či vzorkuje echo s frekvencí cca 10kHz, tedy žádná sláva a odtud plyne nepřesnost.
+
+Myslím, že modul JSN-SR04T vyhodnocuje či vzorkuje echo s frekvencí cca 10kHz, tedy žádná sláva a **odtud plyne nepřesnost**.
 
 - Ve vzdálenosti < než 25cm se nestačí odražené echo detekovat.
 - Ve vzdálenosti > než cca 230cm či vyšší vnitřní čítač přeteče a modul vrátí maximální hodnotu. Pokud se žádné echo nevrátí (detektor míří do volného prostoru) maximální hodnota bývá v intervalu (230,250) cm. S jistou rezervou je měření validní **do 220 cm**.
@@ -63,14 +61,34 @@ according to the UART communication format. In this method, the trigger command 
 needs to be added to the RX pin. The module measures once every time the command is received. The foot outputs the measured
 distance value. The command trigger cycle should be greater than 60ms
 
+# SW
+Snaha byla použít co nejjednodušší a kýmkoli lehce upravitelé řešení.
+	- Vývojové prostředí je Thonny
+	- Zdrojové kódy jsou v MicroPythonu. Vše co je třeba do Raspberry Pico nahrát je ve složce ./SW/2Pico/ 
+		- [Konfigurační soubor](./SW/2Pico/config.json) a provozní data jsou uložena v json souborech v file systému, protože Raspberry Pico nemá vlastní EEPROMku. Limit je max. 100tis přepsání, což je zcela dostatečné, protože json soubory se ukládaní jen sporadicky.
+		- Použité knihovny (složka ./SW/2Pico/lib/ , jsou lehce upravené (projekty pod MIT licencemi), změny nejsou nikde zdokumentovány.
+	- Tvorba vlastních fontů pro LCD je popsána [zde](./SW/tools/fonts/README.md)
+	
 
-#TODOs & BUGs
+
+
+# TODOs & BUGs
 
 - HW
- - PCB layout:
-  - opravit všechna poudra tranzistorů; Momentálně se dá deska osadit, ale všechny tranzistory se musí debilně otočit o 120stupňů.
-  - posunout kondenzátor C7; usnadní se montáž
- - přidat STL model krabičky
-		
-	
-   
+	- PCB Control unit layout:
+		- opravit všechna poudra tranzistorů; Momentálně se dá deska osadit, ale všechny tranzistory se musí debilně otočit o 120stupňů.
+		- posunout kondenzátor C7; usnadní se montáž
+	- [Navrhnout PCB pro Remote sensor Unit](./img/Instalace_1.png); aby to nevypadalo takto...
+	- přidat STL model krabičky
+- SW
+	- Dopnit do Menu možnost konfigurovat průměr studny pro výpočet litrů.
+
+
+
+# Finální produkt
+Trochu fotodokumentace [více zde](./img/)
+![PCB](./img/LCD_screen_1.png)
+![NaZdi1](./img/Final_product_1.png)
+![NaZDi2](./img/Final_product_3.png)
+![VeStudni](./img/Instalace_7.png)
+
