@@ -17,8 +17,7 @@ Drahé řešení je např. [hydrostatický snímač TSH-37](https://www.fiedler.
 
 Pro obě řešení zůstane stejná komunikace mezi senzorem a řídící jednotkou a to přes RS485. TSH-37 vyžaduje protokol Modbus RTU na což není SW momentálně připraven.
 
-### Zobrazovací a řídicí jednotka 
-Základní bloky:
+### Základní blokové schema:
 
 ![BlokoveSchema](./doc/Studna_bokove_schema.png)
 
