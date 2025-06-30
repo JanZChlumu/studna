@@ -21,7 +21,8 @@ Pro obě řešení zůstane stejná komunikace mezi senzorem a řídící jednot
 
 ![BlokoveSchema](./doc/Studna_bokove_schema.png)
 
-[Schema řídící jednotky](./HW/kicad/lcd/lcd.pdf)
+- [Schema řídící jednotky](./HW/kicad/lcd/lcd.pdf)
+- Schema Remote Sensor Unit neexistuje -  je poměrně triviální.
 
 ### Ultrazvukové čidlo
 Waterproof Ultrasonic Module JSN-SR04T
@@ -91,4 +92,5 @@ Trochu fotodokumentace [více zde](./img/)
 ![NaZdi1](./img/Final_product_1.png)
 ![NaZDi2](./img/Final_product_3.png)
 ![VeStudni](./img/Instalace_7.png)
+![VeStudni](./img/Instalace_5.png)
 
