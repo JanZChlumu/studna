@@ -64,11 +64,12 @@ distance value. The command trigger cycle should be greater than 60ms
 # SW
 Snaha byla použít co nejjednodušší a kýmkoli lehce upravitelé řešení.
 
-	- Vývojové prostředí je Thonny
-	- Zdrojové kódy jsou v MicroPythonu. Vše co je třeba do Raspberry Pico nahrát je ve složce ./SW/2Pico/ 
-		- [Konfigurační soubor](./SW/2Pico/config.json) a provozní data jsou uložena v json souborech v file systému, protože Raspberry Pico nemá vlastní EEPROMku. Limit je max. 100tis přepsání, což je zcela dostatečné, protože json soubory se ukládaní jen sporadicky.
-		- Použité knihovny (složka ./SW/2Pico/lib/ , jsou lehce upravené (projekty pod MIT licencemi), změny nejsou nikde zdokumentovány.
-	- Tvorba vlastních fontů pro LCD je popsána [zde](./SW/tools/fonts/README.md)
+- Vývojové prostředí je Thonny
+- Zdrojové kódy jsou v MicroPythonu.
+	- Vše co je třeba do Raspberry Pico nahrát je ve složce ./SW/2Pico/ 
+	- [Konfigurační soubor](./SW/2Pico/config.json) a provozní data jsou uložena v json souborech v file systému, protože Raspberry Pico nemá vlastní EEPROMku. Limit je max. 100tis přepsání, což je zcela dostatečné, protože json soubory se ukládaní jen sporadicky.
+	- Použité knihovny (složka ./SW/2Pico/lib/ , jsou lehce upravené (projekty pod MIT licencemi), změny nejsou nikde zdokumentovány.
+- Tvorba vlastních fontů pro LCD je popsána [zde](./SW/tools/fonts/README.md)
 	
 
 
