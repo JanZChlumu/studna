@@ -83,6 +83,7 @@ Snaha byla použít co nejjednodušší a kýmkoli lehce upravitelé řešení.
 	- přidat STL model krabičky
 - SW
 	- Dopnit do Menu možnost konfigurovat průměr studny pro výpočet litrů.
+	- Bug: shadow vs stored data - v podmenu Historie grafů se přepisuje nově změněná hodnota. Fix: v menu nespouštět měřící task.
 
 
 
